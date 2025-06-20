@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import useVideoStore from '@/stores/videoStore';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { Play, Sparkles, Video, Users } from 'lucide-react';
+import { Play, Sparkles, Video, Users, ArrowLeft } from 'lucide-react';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -17,6 +17,10 @@ export default function LoginPage() {
   
   const login = useVideoStore(state => state.login);
   const router = useRouter();
+
+  const handleBackToLanding = () => {
+    router.push('/');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +49,17 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Background Effects */}
       <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
+      
+      {/* Back to Landing Button */}
+      <div className="absolute top-6 left-6 z-10">
+        <button
+          onClick={handleBackToLanding}
+          className="flex items-center text-slate-300 hover:text-white transition-colors duration-200 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-lg"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Volver al inicio
+        </button>
+      </div>
       
       <div className="relative flex min-h-screen">
         {/* Left Side - Branding */}

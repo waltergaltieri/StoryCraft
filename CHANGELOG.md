@@ -1,5 +1,60 @@
 # StoryCraft AI - Changelog
 
+## Version 2.1.0 - Landing Page Profesional para Agencias
+
+### 🚀 Nueva Landing Page de Marketing
+- **Página de Inicio Profesional**: Completamente rediseñada para agencias de marketing
+- **Hero Section**: Diseño impactante con gradientes modernos y llamada a la acción clara
+- **Estadísticas de Impacto**: 95% tiempo ahorrado, 500+ agencias activas, 50K+ videos creados
+- **Características Detalladas**: 6 características específicas para equipos de marketing
+
+### 💰 Planes de Suscripción B2B
+- **Starter Plan**: $49/mes - Perfecto para equipos pequeños (20 videos, HD 1080p)
+- **Professional Plan**: $149/mes - Para agencias en crecimiento (100 videos, 4K, sin marca de agua)
+- **Enterprise Plan**: $399/mes - Para agencias enterprise (videos ilimitados, marca blanca)
+- **Destacado Visual**: Plan Professional marcado como "Más Popular"
+
+### 🎯 Enfoque en Agencias de Marketing
+- **Testimonios Realistas**: 3 testimonios de directores creativos y CEOs de agencias
+- **Beneficios Específicos**: Tiempo ahorrado, ROI, resultados profesionales
+- **Llamadas a la Acción**: Múltiples CTAs estratégicamente ubicados
+- **Garantías de Confianza**: "Sin tarjeta de crédito requerida", "Cancela cuando quieras"
+
+### 🎨 Diseño y UX
+- **Responsive Design**: Perfectamente adaptado para mobile, tablet y desktop
+- **Esquema de Colores**: slate-900 base con gradientes indigo/purple
+- **Navegación Suave**: Scroll automático a secciones (features, pricing, testimonials)
+- **Efectos Hover**: Animaciones sutiles y transiciones fluidas
+
+### 🔄 Flujo de Navegación Mejorado
+- **Nueva Secuencia**: Landing Page (`/`) → Login (`/login`) → Dashboard (`/dashboard`)
+- **Botón de Retorno**: "Volver al inicio" en página de login
+- **Eliminada Redirección**: Ya no redirige automáticamente al login
+- **Múltiples Puntos de Entrada**: Varios botones llevan al sistema
+
+### 📱 Secciones Implementadas
+- **Navigation Bar**: Logo + menú con enlaces internos + CTA
+- **Hero Section**: Título principal + descripción + botones de acción
+- **Stats Section**: 4 métricas clave con números impactantes
+- **Features Section**: 6 características detalladas con iconos
+- **Pricing Section**: 3 planes con características completas
+- **Testimonials**: 3 testimonios con avatares y roles
+- **CTA Section**: Sección final de conversión con gradiente
+- **Footer**: Links organizados por categorías + copyright
+
+### 🎯 Optimizado para Conversión
+- **Social Proof**: Estadísticas y testimonios para generar confianza
+- **Jerarquía Visual**: Texto grande, contrastes claros, espaciado adecuado
+- **Urgencia Sutil**: "Prueba Gratuita 14 Días", "Acceso inmediato"
+- **Reducción de Fricción**: Demo mode claramente indicado
+
+### 📝 Contenido en Español
+- **Completamente Localizado**: Todo el contenido en español para mercado hispanohablante
+- **Jerga de Marketing**: Términos específicos de la industria
+- **Tonalidad Profesional**: Apropiada para decisores B2B
+
+---
+
 ## Version 2.0.2 - Corrección Crítica: Audio en Concatenación
 
 ### 🔊 Problema CRÍTICO Solucionado
