@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { config } from '@/lib/config';
-import { getPrompt } from '@/lib/prompts-optimized';
+import { generateFilmmakerPrompt, validateAndImproveScenes } from '@/lib/prompts-filmmaker-v2';
+import promptsV2 from '@/lib/prompts-filmmaker-v2';
 
 // Helper function to safely extract scene description
 const extractSceneDescription = (scene: any): string => {
@@ -136,14 +137,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Calculate required number of scenes (each scene = 8 seconds for Veo 3)
     const requiredScenes = body.duration / 8; // 8s=1, 16s=2, 24s=3, 32s=4
     
-    // Get the specific prompt based on combination (always returns a valid prompt)
-    const promptTemplate = getPrompt(body.objective, body.tone, body.style);
-
-    // Replace variables in the prompt
-    const finalPrompt = promptTemplate
-      .replace(/\$duracion/g, body.duration.toString())
-      .replace(/\$descripcion/g, body.description)
-      .replace(/\$escenas/g, requiredScenes.toString());
+    // Generate the optimized prompt using the new system
+    const finalPrompt = generateFilmmakerPrompt(
+      body.objective,
+      body.tone,
+      body.style,
+      body.duration,
+      body.description
+    );
 
     // Prepare OpenAI request
     const openAIRequest: OpenAIRequest = {
@@ -151,15 +152,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       messages: [
         {
           role: 'system',
-          content: 'You are an expert AI filmmaker specializing in creating detailed scene descriptions for marketing videos. Always respond with valid JSON containing an array of scenes.'
+          content: promptsV2.BASE_SYSTEM_PROMPT
         },
         {
           role: 'user',
           content: finalPrompt
         }
       ],
-      max_tokens: 4000,
-      temperature: 0.7
+      max_tokens: 3000,
+      temperature: 0.3 // Reducir temperatura para mayor consistencia
     };
 
     // Call OpenAI API
@@ -204,37 +205,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       // Try to parse as JSON first
       const parsedResponse = JSON.parse(aiResponse);
-      scenes = parsedResponse.scenes || parsedResponse;
+      const rawScenes = parsedResponse.scenes || parsedResponse;
       
-      // Validate and format scenes - CADA ESCENA DEBE SER DE 8 SEGUNDOS MÁXIMO
-      scenes = scenes.map((scene: any, index: number) => ({
-        id: scene.id || `scene_${index + 1}`,
-        title: scene.title || `Scene ${index + 1}`,
-        description: extractSceneDescription(scene),
-        duration: 8, // Veo 3 solo permite videos de 8 segundos máximo
+      if (!Array.isArray(rawScenes)) {
+        throw new Error('Response is not an array of scenes');
+      }
+      
+      // Use the new validation function
+      const validatedScenes = validateAndImproveScenes(rawScenes, requiredScenes);
+      
+      // Convert to the expected Scene format
+      scenes = validatedScenes.map((scene, index) => ({
+        id: scene.id,
+        title: scene.title,
+        description: `${scene.description}\n\nElementos visuales: ${scene.visualElements}\n\nAcción: ${scene.action}`,
+        duration: scene.duration,
         order: index + 1
       }));
       
     } catch (parseError) {
-      // If JSON parsing fails, try to extract scenes from text
-      console.warn('JSON parsing failed, attempting text extraction:', parseError);
+      console.error('JSON parsing failed:', parseError);
+      console.log('AI Response:', aiResponse);
       
-      // Split by common delimiters and create scenes
-      const sceneTexts = aiResponse
-        .split(/(?:Scene \d+:|Escena \d+:|\d+\.|-)/)
-        .filter(text => text.trim().length > 20)
-        .slice(0, 4); // Limit to 4 scenes max
-      
-      scenes = sceneTexts.map((text, index) => ({
-        id: `scene_${index + 1}`,
-        title: `Scene ${index + 1}`,
-        description: extractSceneDescription(text),
-        duration: 8, // Veo 3 solo permite videos de 8 segundos máximo
-        order: index + 1
-      }));
+      return NextResponse.json(
+        { 
+          error: 'Parse Error',
+          message: 'La IA no generó un formato JSON válido. Por favor intenta de nuevo.',
+          details: parseError instanceof Error ? parseError.message : 'Unknown parsing error'
+        } as ErrorResponse,
+        { status: 500 }
+      );
     }
 
-    // Ensure we have valid scenes
+    // Ensure we have valid scenes (validateAndImproveScenes already handles this)
     if (!scenes || scenes.length === 0) {
       return NextResponse.json(
         { 
@@ -243,25 +246,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         } as ErrorResponse,
         { status: 500 }
       );
-    }
-
-    // Ensure we have exactly the required number of scenes
-    if (scenes.length !== requiredScenes) {
-      // Adjust number of scenes to match requirement
-      if (scenes.length > requiredScenes) {
-        scenes = scenes.slice(0, requiredScenes); // Take only required number
-      } else {
-        // Duplicate last scene if we need more
-        while (scenes.length < requiredScenes) {
-          const lastScene = scenes[scenes.length - 1];
-          scenes.push({
-            ...lastScene,
-            id: `scene_${scenes.length + 1}`,
-            title: `Scene ${scenes.length + 1}`,
-            order: scenes.length + 1
-          });
-        }
-      }
     }
 
     // Total duration is always scenes.length * 8 (each scene is 8 seconds)
