@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { config } from '@/lib/config';
-import { generateFilmmakerPrompt, validateAndImproveScenes } from '@/lib/prompts-filmmaker-v2';
-import promptsV2 from '@/lib/prompts-filmmaker-v2';
+import { getPrompt } from '@/lib/prompts-optimized';
 
 // Helper function to safely extract scene description
 const extractSceneDescription = (scene: any): string => {
@@ -18,8 +17,18 @@ const extractSceneDescription = (scene: any): string => {
     // If it has scene components, format them nicely
     if (scene.Visual || scene.Protagonista || scene.Escenario) {
       let result = '';
-      if (scene.Protagonista) result += `Protagonista: ${scene.Protagonista}\n\n`;
-      if (scene.Escenario) result += `Escenario: ${scene.Escenario}\n\n`;
+      if (scene.Protagonista) {
+        const protagonista = typeof scene.Protagonista === 'object' ? 
+          JSON.stringify(scene.Protagonista).replace(/[{}]/g, '').replace(/"/g, '') : 
+          scene.Protagonista;
+        result += `Protagonista: ${protagonista}\n\n`;
+      }
+      if (scene.Escenario) {
+        const escenario = typeof scene.Escenario === 'object' ? 
+          JSON.stringify(scene.Escenario).replace(/[{}]/g, '').replace(/"/g, '') : 
+          scene.Escenario;
+        result += `Escenario: ${escenario}\n\n`;
+      }
       if (scene.Visual) result += `Visual: ${scene.Visual}\n\n`;
       if (scene.Cámara) result += `Cámara: ${scene.Cámara}\n\n`;
       if (scene.Iluminación) result += `Iluminación: ${scene.Iluminación}\n\n`;
@@ -34,9 +43,14 @@ const extractSceneDescription = (scene: any): string => {
       return typeof scene.content === 'string' ? scene.content : JSON.stringify(scene.content);
     }
     
-    // Otherwise stringify the whole object
+    // Otherwise stringify the whole object but format it nicely
     try {
-      return JSON.stringify(scene, null, 2);
+      const formatted = JSON.stringify(scene, null, 2)
+        .replace(/[{}]/g, '')
+        .replace(/"/g, '')
+        .replace(/,\n/g, '\n')
+        .trim();
+      return formatted;
     } catch {
       return String(scene);
     }
@@ -137,14 +151,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Calculate required number of scenes (each scene = 8 seconds for Veo 3)
     const requiredScenes = body.duration / 8; // 8s=1, 16s=2, 24s=3, 32s=4
     
-    // Generate the optimized prompt using the new system
-    const finalPrompt = generateFilmmakerPrompt(
-      body.objective,
-      body.tone,
-      body.style,
-      body.duration,
-      body.description
-    );
+    // Get the specific prompt based on combination (always returns a valid prompt)
+    const promptTemplate = getPrompt(body.objective, body.tone, body.style);
+
+    // Replace variables in the prompt
+    const finalPrompt = promptTemplate
+      .replace(/\$duracion/g, body.duration.toString())
+      .replace(/\$descripcion/g, body.description)
+      .replace(/\$escenas/g, requiredScenes.toString());
 
     // Prepare OpenAI request
     const openAIRequest: OpenAIRequest = {
@@ -152,14 +166,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       messages: [
         {
           role: 'system',
-          content: promptsV2.BASE_SYSTEM_PROMPT
+          content: 'Eres un experto guionista y director de videos comerciales. Tu especialidad es crear guiones detallados y específicos para videos de marketing que generen resultados. Siempre responde con JSON válido conteniendo un array de escenas. Cada escena debe durar exactamente 8 segundos.'
         },
         {
           role: 'user',
           content: finalPrompt
         }
       ],
-      max_tokens: 3000,
+      max_tokens: 4000,
       temperature: 0.3 // Reducir temperatura para mayor consistencia
     };
 
@@ -205,39 +219,37 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     try {
       // Try to parse as JSON first
       const parsedResponse = JSON.parse(aiResponse);
-      const rawScenes = parsedResponse.scenes || parsedResponse;
+      scenes = parsedResponse.scenes || parsedResponse;
       
-      if (!Array.isArray(rawScenes)) {
-        throw new Error('Response is not an array of scenes');
-      }
-      
-      // Use the new validation function
-      const validatedScenes = validateAndImproveScenes(rawScenes, requiredScenes);
-      
-      // Convert to the expected Scene format
-      scenes = validatedScenes.map((scene, index) => ({
-        id: scene.id,
-        title: scene.title,
-        description: `${scene.description}\n\nElementos visuales: ${scene.visualElements}\n\nAcción: ${scene.action}`,
-        duration: scene.duration,
+      // Validate and format scenes - CADA ESCENA DEBE SER DE 8 SEGUNDOS MÁXIMO
+      scenes = scenes.map((scene: any, index: number) => ({
+        id: scene.id || `scene_${index + 1}`,
+        title: scene.title || `Scene ${index + 1}`,
+        description: extractSceneDescription(scene),
+        duration: 8, // Veo 3 solo permite videos de 8 segundos máximo
         order: index + 1
       }));
       
     } catch (parseError) {
-      console.error('JSON parsing failed:', parseError);
-      console.log('AI Response:', aiResponse);
+      // If JSON parsing fails, try to extract scenes from text
+      console.warn('JSON parsing failed, attempting text extraction:', parseError);
       
-      return NextResponse.json(
-        { 
-          error: 'Parse Error',
-          message: 'La IA no generó un formato JSON válido. Por favor intenta de nuevo.',
-          details: parseError instanceof Error ? parseError.message : 'Unknown parsing error'
-        } as ErrorResponse,
-        { status: 500 }
-      );
+      // Split by common delimiters and create scenes
+      const sceneTexts = aiResponse
+        .split(/(?:Scene \d+:|Escena \d+:|\d+\.|-)/)
+        .filter(text => text.trim().length > 20)
+        .slice(0, 4); // Limit to 4 scenes max
+      
+      scenes = sceneTexts.map((text, index) => ({
+        id: `scene_${index + 1}`,
+        title: `Scene ${index + 1}`,
+        description: extractSceneDescription(text),
+        duration: 8, // Veo 3 solo permite videos de 8 segundos máximo
+        order: index + 1
+      }));
     }
 
-    // Ensure we have valid scenes (validateAndImproveScenes already handles this)
+    // Ensure we have valid scenes
     if (!scenes || scenes.length === 0) {
       return NextResponse.json(
         { 
@@ -246,6 +258,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         } as ErrorResponse,
         { status: 500 }
       );
+    }
+
+    // Ensure we have exactly the required number of scenes
+    if (scenes.length !== requiredScenes) {
+      // Adjust number of scenes to match requirement
+      if (scenes.length > requiredScenes) {
+        scenes = scenes.slice(0, requiredScenes); // Take only required number
+      } else {
+        // Duplicate last scene if we need more
+        while (scenes.length < requiredScenes) {
+          const lastScene = scenes[scenes.length - 1];
+          scenes.push({
+            ...lastScene,
+            id: `scene_${scenes.length + 1}`,
+            title: `Scene ${scenes.length + 1}`,
+            order: scenes.length + 1
+          });
+        }
+      }
     }
 
     // Total duration is always scenes.length * 8 (each scene is 8 seconds)
