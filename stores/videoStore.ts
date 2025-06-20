@@ -746,7 +746,7 @@ const useVideoStore = create<VideoStore>()(
 
       createConcatenatedVideoBlob: async (videoPaths: string[]) => {
         try {
-          console.log('🎬 Iniciando concatenación REAL de videos:', videoPaths.map((_, i) => `Escena ${i + 1}`));
+          console.log('🎬 Iniciando concatenación REAL de videos CON AUDIO:', videoPaths.map((_, i) => `Escena ${i + 1}`));
           
           if (videoPaths.length === 1) {
             // Si solo hay un video, devolverlo directamente
@@ -755,7 +755,7 @@ const useVideoStore = create<VideoStore>()(
             return await response.blob();
           }
 
-          // CONCATENACIÓN REAL usando Canvas y MediaRecorder
+          // CONCATENACIÓN REAL CON AUDIO usando Canvas + Audio Context
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           if (!ctx) throw new Error('No se pudo crear contexto de canvas');
@@ -764,10 +764,20 @@ const useVideoStore = create<VideoStore>()(
           canvas.width = 1920; // 1080p width
           canvas.height = 1080; // 1080p height
 
-          // Crear MediaRecorder para capturar el canvas
-          const stream = canvas.captureStream(30); // 30 FPS
-          const mediaRecorder = new MediaRecorder(stream, {
-            mimeType: 'video/webm;codecs=vp9' // Mejor calidad
+          // Crear AudioContext para manejar audio
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const audioDestination = audioContext.createMediaStreamDestination();
+
+          // Combinar streams de video y audio
+          const videoStream = canvas.captureStream(30); // 30 FPS
+          const combinedStream = new MediaStream([
+            ...videoStream.getVideoTracks(),
+            ...audioDestination.stream.getAudioTracks()
+          ]);
+
+          // Crear MediaRecorder con stream combinado
+          const mediaRecorder = new MediaRecorder(combinedStream, {
+            mimeType: 'video/webm;codecs=vp9,opus' // Video con audio
           });
 
           const chunks: Blob[] = [];
@@ -780,27 +790,30 @@ const useVideoStore = create<VideoStore>()(
             };
 
             mediaRecorder.onstop = () => {
+              audioContext.close();
               const finalBlob = new Blob(chunks, { type: 'video/webm' });
-              console.log(`✅ Video final concatenado: ${videoPaths.length} escenas, tamaño: ${(finalBlob.size / 1024 / 1024).toFixed(2)}MB`);
+              console.log(`✅ Video final concatenado CON AUDIO: ${videoPaths.length} escenas, tamaño: ${(finalBlob.size / 1024 / 1024).toFixed(2)}MB`);
               resolve(finalBlob);
             };
 
             mediaRecorder.onerror = (error) => {
               console.error('Error en MediaRecorder:', error);
+              audioContext.close();
               reject(error);
             };
 
-            // Función para reproducir cada video en el canvas
+            // Función para reproducir cada video en el canvas Y capturar audio
             const playVideosSequentially = async () => {
               mediaRecorder.start();
               
               for (let i = 0; i < videoPaths.length; i++) {
-                console.log(`🎬 Procesando Escena ${i + 1}/${videoPaths.length}`);
+                console.log(`🎬 Procesando Escena ${i + 1}/${videoPaths.length} (Video + Audio)`);
                 
                 try {
                   const video = document.createElement('video');
                   video.crossOrigin = 'anonymous';
-                  video.muted = true;
+                  video.muted = false; // IMPORTANTE: NO silenciar para capturar audio
+                  video.volume = 1.0; // Volumen completo
                   
                   // Cargar video
                   await new Promise<void>((resolveVideo, rejectVideo) => {
@@ -812,14 +825,40 @@ const useVideoStore = create<VideoStore>()(
                     video.src = videoPaths[i];
                   });
 
-                  // Reproducir video en canvas
+                  // Crear fuente de audio para este video
+                  let audioSource: MediaElementAudioSourceNode | null = null;
+                  try {
+                    audioSource = audioContext.createMediaElementSource(video);
+                    audioSource.connect(audioDestination);
+                    console.log(`🔊 Audio conectado para Escena ${i + 1}`);
+                  } catch (audioError) {
+                    console.warn(`⚠️ No se pudo conectar audio para Escena ${i + 1}:`, audioError);
+                  }
+
+                  // Reproducir video en canvas Y capturar audio
                   await new Promise<void>((resolvePlayback) => {
                     video.currentTime = 0;
-                    video.play();
+                    
+                    const playPromise = video.play();
+                    if (playPromise) {
+                      playPromise.catch(playError => {
+                        console.warn(`⚠️ Error reproduciendo video ${i + 1}:`, playError);
+                      });
+                    }
 
                     const drawFrame = () => {
                       if (video.ended || video.paused) {
-                        console.log(`✅ Escena ${i + 1} completada`);
+                        console.log(`✅ Escena ${i + 1} completada (Video + Audio)`);
+                        
+                        // Desconectar audio source
+                        if (audioSource) {
+                          try {
+                            audioSource.disconnect();
+                          } catch (disconnectError) {
+                            console.warn('Error desconectando audio:', disconnectError);
+                          }
+                        }
+                        
                         resolvePlayback();
                         return;
                       }
@@ -830,7 +869,17 @@ const useVideoStore = create<VideoStore>()(
                     };
 
                     video.ontimeupdate = drawFrame;
-                    video.onended = () => resolvePlayback();
+                    video.onended = () => {
+                      // Desconectar audio source
+                      if (audioSource) {
+                        try {
+                          audioSource.disconnect();
+                        } catch (disconnectError) {
+                          console.warn('Error desconectando audio:', disconnectError);
+                        }
+                      }
+                      resolvePlayback();
+                    };
                   });
 
                 } catch (error) {
@@ -839,7 +888,7 @@ const useVideoStore = create<VideoStore>()(
                 }
               }
 
-              console.log('🎬 Todas las escenas procesadas, finalizando grabación...');
+              console.log('🎬 Todas las escenas procesadas (Video + Audio), finalizando grabación...');
               mediaRecorder.stop();
             };
 

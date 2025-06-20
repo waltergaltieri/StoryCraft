@@ -1,5 +1,27 @@
 # StoryCraft AI - Changelog
 
+## Version 2.0.2 - Corrección Crítica: Audio en Concatenación
+
+### 🔊 Problema CRÍTICO Solucionado
+- **Audio Perdido**: Videos individuales tenían audio, pero video final concatenado lo perdía
+- **Causa**: Canvas solo captura video, no audio - sistema anterior silenciaba videos
+- **Solución**: Implementado AudioContext + MediaElementAudioSource para capturar audio
+
+### 🛠️ Correcciones Técnicas
+- **AudioContext**: Creado sistema de audio paralelo al canvas de video
+- **MediaElementAudioSource**: Cada video se conecta al destino de audio
+- **Stream Combinado**: Video (Canvas) + Audio (AudioContext) en MediaRecorder
+- **Codec Actualizado**: `video/webm;codecs=vp9,opus` para soportar audio
+- **Volumen Completo**: `video.muted = false` y `video.volume = 1.0`
+
+### ✅ Resultado
+- **Videos Individuales**: ✅ Con audio (siempre funcionó)
+- **Video Final Concatenado**: ✅ CON AUDIO (ahora corregido)
+- **Calidad**: Mantiene calidad de audio original de cada escena
+- **Sincronización**: Audio y video perfectamente sincronizados
+
+---
+
 ## Version 2.0.1 - Diagnóstico y Corrección de Créditos
 
 ### 🔍 Diagnóstico Completo
