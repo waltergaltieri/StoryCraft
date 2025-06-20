@@ -1,5 +1,24 @@
 # StoryCraft AI - Changelog
 
+## Version 2.0.1 - Diagnóstico y Corrección de Créditos
+
+### 🔍 Diagnóstico Completo
+- **Problema Identificado**: Error 500 causado por créditos insuficientes en cuenta KieAI
+- **Solución**: Mejorado manejo de errores para mostrar mensajes claros
+- **Configuración**: Corregida configuración de API keys en archivo .env.local
+
+### 🛠️ Correcciones Técnicas
+- **Manejo de Error 402**: Agregado manejo específico para créditos insuficientes
+- **Mensajes en Español**: Errores ahora se muestran en español para mejor UX
+- **Detección Dual**: Sistema detecta error 402 tanto en headers HTTP como en cuerpo de respuesta
+- **Diagnóstico Automático**: Script de prueba implementado para identificar problemas de conectividad
+
+### 📝 Mensaje para Usuario
+**ACCIÓN REQUERIDA**: Para continuar generando videos, necesitas recargar créditos en tu cuenta de KieAI. 
+El sistema ahora te mostrará un mensaje claro cuando esto ocurra.
+
+---
+
 ## Version 2.0 - Video Concatenation & User Experience Optimization
 
 ### 🎯 Nuevas Funcionalidades

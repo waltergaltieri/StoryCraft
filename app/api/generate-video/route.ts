@@ -117,8 +117,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (kieaiResponse.status === 402) {
         return NextResponse.json(
           { 
-            error: 'Insufficient Credits',
-            message: 'Account does not have enough credits to perform the operation',
+            error: 'Créditos Insuficientes',
+            message: 'La cuenta de KieAI no tiene suficientes créditos para generar el video. Por favor, recarga créditos en tu cuenta de KieAI.',
             code: 'KIEAI_INSUFFICIENT_CREDITS'
           } as ErrorResponse,
           { status: 402 }
@@ -183,10 +183,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Check if request was successful according to KieAI response format
     if (kieaiData.code !== 200) {
+      // Handle specific error codes from KieAI response body
+      if (kieaiData.code === 402) {
+        return NextResponse.json(
+          { 
+            error: 'Créditos Insuficientes',
+            message: 'La cuenta de KieAI no tiene suficientes créditos para generar el video. Por favor, recarga créditos en tu cuenta de KieAI.',
+            code: 'KIEAI_INSUFFICIENT_CREDITS'
+          } as ErrorResponse,
+          { status: 402 }
+        );
+      }
+      
       return NextResponse.json(
         { 
-          error: 'Generation Error',
-          message: kieaiData.msg || 'Failed to start video generation',
+          error: 'Error de Generación',
+          message: kieaiData.msg || 'No se pudo iniciar la generación del video',
           code: 'KIEAI_GENERATION_FAILED'
         } as ErrorResponse,
         { status: 500 }

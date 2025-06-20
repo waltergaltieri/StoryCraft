@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { config } from '@/lib/config';
-import { MASTER_PROMPT_ENGINEERING } from '@/lib/prompt-engineering';
 
 // Request types
 interface PromptEngineeringRequest {
@@ -69,8 +68,43 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Replace the $escena variable in the master prompt
-    const finalPrompt = MASTER_PROMPT_ENGINEERING.replace(/\$escena/g, body.scene.trim());
+    // Create the correct prompt for Veo 3 format conversion
+    const finalPrompt = `Actúa como un especialista en prompt engineering para Veo 3. Tu tarea es convertir la descripción detallada de una escena en un prompt técnico optimizado para generación de video con IA.
+
+Recibirás la siguiente descripción estructurada de escena:
+
+${body.scene.trim()}
+
+Debes convertirla al formato exacto de Veo 3 siguiendo esta estructura:
+
+[Establishing shot]: [Descripción específica del encuadre inicial y tipo de plano]
+
+[Subject details + environment]: [Descripción completa de TODOS los sujetos (personas, animales, objetos) y entorno en inglés, manteniendo todos los detalles físicos, características y elementos del ambiente]
+
+[Energy/mood]: [Atmósfera y energía específica de la escena]
+
+[Environment details]: [Detalles precisos del entorno, iluminación ambiental, elementos decorativos, música y efectos de sonido]
+
+[Subject action description]: [Descripción exacta de las acciones de TODOS los sujetos paso a paso]
+
+[Dialogue]: 
+- Si hay diálogos: (Speaking with [tone description]. The following dialogue MUST BE spoken in Spanish:) "[diálogo exacto en español entre comillas dobles]"
+- Si no hay diálogos: There is no dialogue in this scene.
+
+[Lighting]: [Especificaciones técnicas de iluminación, dirección y calidad de luz]
+
+[Style]: [Estilo cinematográfico específico con referencias técnicas de cámara y movimiento]
+
+INSTRUCCIONES CRÍTICAS:
+- TODO el prompt debe estar en inglés EXCEPTO los diálogos específicos
+- Los diálogos deben estar en español y entre comillas dobles ""
+- Mantén TODOS los detalles de la descripción original
+- Adapta la descripción a lo que realmente aparece en la escena (personas, objetos, animales, etc.)
+- Usa terminología cinematográfica técnica específica
+- Sé extremadamente específico con colores, texturas, y elementos visuales
+- Mantén la consistencia visual exactamente como se describe
+
+IMPORTANTE: Genera ÚNICAMENTE el prompt optimizado para Veo 3. No agregues texto adicional antes o después del prompt.`;
 
     // Prepare OpenAI request
     const openAIRequest: OpenAIRequest = {
@@ -78,7 +112,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       messages: [
         {
           role: 'system',
-          content: 'You are an expert prompt engineer specializing in optimizing video generation prompts for Google Veo 3. Your task is to transform scene descriptions into detailed, precise prompts that will generate high-quality videos. Focus on visual details, camera movements, lighting, composition, and artistic style while maintaining the original creative intent.'
+          content: 'Eres un especialista experto en prompt engineering para Veo 3. Tu única tarea es convertir descripciones de escenas al formato técnico específico requerido por Veo 3. Debes seguir EXACTAMENTE la estructura con las secciones marcadas entre **[corchetes]** y mantener todos los detalles de la escena original. Responde ÚNICAMENTE con el prompt formateado, sin texto adicional.'
         },
         {
           role: 'user',
