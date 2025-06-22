@@ -38,7 +38,7 @@ export default function LandingPage() {
               <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Video className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-white">StoryCraft AI</span>
+              <span className="text-lg sm:text-xl font-bold text-white">StoryCraft AI</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-slate-300 hover:text-white transition-colors">Características</a>
@@ -51,36 +51,44 @@ export default function LandingPage() {
                 Comenzar Prueba
               </button>
             </div>
+            <div className="md:hidden">
+              <button 
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm"
+              >
+                Probar
+              </button>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="pt-24 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 leading-tight">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-white mb-6 sm:mb-8 leading-tight">
               Crea Videos de
               <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"> Marketing </span>
               con IA
             </h1>
-            <p className="text-xl md:text-2xl text-slate-300 mb-12 leading-relaxed">
+            <p className="text-lg sm:text-xl md:text-2xl text-slate-300 mb-8 sm:mb-12 leading-relaxed px-4 sm:px-0">
               La plataforma definitiva para agencias de marketing que necesitan crear videos profesionales 
               en minutos, no días. Potenciado por IA de última generación.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center px-4 sm:px-0">
               <button 
                 onClick={handleGetStarted}
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 flex items-center justify-center"
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all duration-200 flex items-center justify-center"
               >
                 <Play className="w-5 h-5 mr-2" />
                 Prueba Gratuita 14 Días
               </button>
-              <button className="border border-slate-600 text-slate-300 hover:text-white hover:border-slate-500 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200">
+              <button className="border border-slate-600 text-slate-300 hover:text-white hover:border-slate-500 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg transition-all duration-200">
                 Ver Demo en Vivo
               </button>
             </div>
-            <p className="text-sm text-slate-500 mt-4">
+            <p className="text-sm text-slate-500 mt-4 px-4 sm:px-0">
               Sin tarjeta de crédito requerida • Acceso inmediato • Cancela cuando quieras
             </p>
           </div>
@@ -88,50 +96,50 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-slate-800/50">
+      <section className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 bg-slate-800/50">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-white mb-2">95%</div>
-              <div className="text-slate-400">Tiempo Ahorrado</div>
+              <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">95%</div>
+              <div className="text-slate-400 text-sm sm:text-base">Tiempo Ahorrado</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-white mb-2">500+</div>
-              <div className="text-slate-400">Agencias Activas</div>
+              <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">500+</div>
+              <div className="text-slate-400 text-sm sm:text-base">Agencias Activas</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-white mb-2">50K+</div>
-              <div className="text-slate-400">Videos Creados</div>
+              <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">50K+</div>
+              <div className="text-slate-400 text-sm sm:text-base">Videos Creados</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-white mb-2">4.9/5</div>
-              <div className="text-slate-400">Satisfacción Cliente</div>
+              <div className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">4.9/5</div>
+              <div className="text-slate-400 text-sm sm:text-base">Satisfacción Cliente</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 px-4 sm:px-6 lg:px-8">
+      <section id="features" className="py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6 px-4 sm:px-0">
               Todo lo que necesitas para videos de marketing
             </h2>
-            <p className="text-xl text-slate-300 max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl text-slate-300 max-w-3xl mx-auto px-4 sm:px-0">
               Desde la conceptualización hasta la entrega final, StoryCraft AI automatiza 
               todo el proceso de creación de video.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 px-4 sm:px-0">
             {features.map((feature, index) => (
-              <div key={index} className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 hover:border-slate-600 transition-all duration-200">
-                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6 text-white" />
+              <div key={index} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 sm:p-6 hover:border-slate-600 transition-all duration-200">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mb-3 sm:mb-4">
+                  <feature.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3">{feature.title}</h3>
-                <p className="text-slate-300">{feature.description}</p>
+                <h3 className="text-lg sm:text-xl font-semibold text-white mb-2 sm:mb-3">{feature.title}</h3>
+                <p className="text-slate-300 text-sm sm:text-base">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -139,44 +147,44 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-800/30">
+      <section id="pricing" className="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-slate-800/30">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 sm:mb-6 px-4 sm:px-0">
               Planes diseñados para agencias
             </h2>
-            <p className="text-xl text-slate-300 max-w-3xl mx-auto">
+            <p className="text-lg sm:text-xl text-slate-300 max-w-3xl mx-auto px-4 sm:px-0">
               Desde equipos pequeños hasta agencias enterprise. Elige el plan que mejor se adapte a tu volumen de trabajo.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 px-4 sm:px-0">
             {pricingPlans.map((plan, index) => (
               <div 
                 key={index} 
-                className={`relative bg-slate-800 border rounded-xl p-8 transition-all duration-200 ${
+                className={`relative bg-slate-800 border rounded-xl p-6 sm:p-8 transition-all duration-200 ${
                   plan.featured 
-                    ? 'border-indigo-500 shadow-lg shadow-indigo-500/20 scale-105' 
+                    ? 'border-indigo-500 shadow-lg shadow-indigo-500/20 md:scale-105' 
                     : 'border-slate-700 hover:border-slate-600'
                 }`}
               >
                 {plan.featured && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-semibold">
+                    <span className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 sm:px-4 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-semibold">
                       Más Popular
                     </span>
                   </div>
                 )}
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
-                  <div className="text-4xl font-bold text-white mb-1">
+                  <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">{plan.name}</h3>
+                  <div className="text-3xl sm:text-4xl font-bold text-white mb-1">
                     ${plan.price}
-                    <span className="text-lg text-slate-400">/mes</span>
+                    <span className="text-base sm:text-lg text-slate-400">/mes</span>
                   </div>
-                  <p className="text-slate-400 mb-8">{plan.description}</p>
+                  <p className="text-slate-400 mb-6 sm:mb-8 text-sm sm:text-base">{plan.description}</p>
                   <button 
                     onClick={handleGetStarted}
-                    className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
+                    className={`w-full py-2 sm:py-3 rounded-lg font-semibold transition-all duration-200 text-sm sm:text-base ${
                       plan.featured
                         ? 'bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white'
                         : 'bg-slate-700 hover:bg-slate-600 text-white'
@@ -185,10 +193,10 @@ export default function LandingPage() {
                     {plan.buttonText}
                   </button>
                 </div>
-                <ul className="mt-8 space-y-4">
+                <ul className="mt-6 sm:mt-8 space-y-3 sm:space-y-4">
                   {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-center text-slate-300">
-                      <Check className="w-5 h-5 text-green-400 mr-3 flex-shrink-0" />
+                    <li key={featureIndex} className="flex items-start text-slate-300 text-sm sm:text-base">
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mr-2 sm:mr-3 flex-shrink-0 mt-0.5" />
                       {feature}
                     </li>
                   ))}

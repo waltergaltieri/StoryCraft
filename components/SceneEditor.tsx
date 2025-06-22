@@ -41,7 +41,10 @@ export default function SceneEditor({ onGenerateVideos }: SceneEditorProps) {
     updateScene, 
     generateSingleVideo,
     concatenateVideos,
-    currentProject 
+    currentProject,
+    objective,
+    tone,
+    style
   } = useVideoStore();
 
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
@@ -91,7 +94,23 @@ export default function SceneEditor({ onGenerateVideos }: SceneEditorProps) {
   };
 
   const handleRegenerateVideo = (sceneId: string) => {
-    generateSingleVideo(sceneId);
+    // Mostrar información contextual antes de regenerar
+    const scene = scenes.find(s => s.id === sceneId);
+    const sceneIndex = scenes.findIndex(s => s.id === sceneId);
+    
+    if (scene && window.confirm(
+      `🧠 Regeneración Contextual Inteligente\n\n` +
+      `Escena ${sceneIndex + 1} de ${scenes.length}\n\n` +
+      `Esta regeneración mantendrá coherencia con:\n` +
+      `• El objetivo del proyecto: ${objective}\n` +
+      `• El tono narrativo: ${tone}\n` +
+      `• El estilo visual: ${style}\n` +
+      `• La continuidad con las demás escenas\n\n` +
+      `¿Proceder con la regeneración contextual?`
+    )) {
+      console.log(`🎬 Iniciando regeneración contextual para Escena ${sceneIndex + 1}`);
+      generateSingleVideo(sceneId);
+    }
   };
 
   const getStatusIcon = (status?: string) => {
@@ -126,41 +145,41 @@ export default function SceneEditor({ onGenerateVideos }: SceneEditorProps) {
   const completedScenes = scenes.filter(s => s.generationStatus === 'completed').length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="text-center space-y-4">
-        <h2 className="text-3xl font-bold text-white">
+      <div className="text-center space-y-3 sm:space-y-4">
+        <h2 className="text-2xl sm:text-3xl font-bold text-white px-4 sm:px-0">
           Revisa y Edita tu Guión
         </h2>
-        <p className="text-slate-300 max-w-2xl mx-auto">
+        <p className="text-slate-300 max-w-2xl mx-auto text-sm sm:text-base px-4 sm:px-0">
           Tu guión generado por IA está listo. Revisa cada escena, haz ediciones si necesitas, y luego genera tus videos.
         </p>
         
         {/* Script Overview */}
-        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-6 max-w-md mx-auto">
-          <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-4 sm:p-6 max-w-md mx-auto">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 text-center">
             <div>
-              <div className="text-2xl font-bold text-indigo-400">{scenes.length}</div>
-              <div className="text-sm text-slate-400">Escenas</div>
+              <div className="text-xl sm:text-2xl font-bold text-indigo-400">{scenes.length}</div>
+              <div className="text-xs sm:text-sm text-slate-400">Escenas</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-indigo-400">{duration}s</div>
-              <div className="text-sm text-slate-400">Duración Total</div>
+              <div className="text-xl sm:text-2xl font-bold text-indigo-400">{duration}s</div>
+              <div className="text-xs sm:text-sm text-slate-400">Duración Total</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-indigo-400">{completedScenes}</div>
-              <div className="text-sm text-slate-400">Completadas</div>
+              <div className="text-xl sm:text-2xl font-bold text-indigo-400">{completedScenes}</div>
+              <div className="text-xs sm:text-sm text-slate-400">Completadas</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Generate All Videos Button */}
-      <div className="text-center">
+      <div className="text-center px-4 sm:px-0">
         <Button
           onClick={onGenerateVideos}
           disabled={!canGenerateVideos}
-          className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-medium"
+          className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 sm:px-8 py-3 rounded-lg font-medium"
         >
           <Play className="w-5 h-5 mr-2" />
           Generar Todos los Videos
@@ -168,149 +187,106 @@ export default function SceneEditor({ onGenerateVideos }: SceneEditorProps) {
       </div>
 
       {/* Scenes List */}
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
         {scenes.map((scene, index) => (
-          <Card key={scene.id} className="p-6 bg-slate-800/80 border-slate-600/50 hover:bg-slate-800 transition-colors">
+          <Card key={scene.id} className="p-4 sm:p-6 bg-slate-800/80 border-slate-600/50 hover:bg-slate-800 transition-colors">
             <div className="space-y-4">
               {/* Scene Header */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-sm font-bold text-white">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-xs sm:text-sm font-bold text-white">
                       {index + 1}
                     </span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white text-lg">
+                    <h3 className="font-semibold text-white text-base sm:text-lg">
                       Escena {index + 1}
                     </h3>
-                    <p className="text-sm text-indigo-300">
+                    <p className="text-xs sm:text-sm text-indigo-300">
                       {Math.round(duration / scenes.length)} segundos
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <div className="flex items-center space-x-2">
                     {getStatusIcon(scene.generationStatus)}
-                    <span className="text-sm text-slate-200 font-medium">
+                    <span className="text-xs sm:text-sm text-slate-200 font-medium">
                       {getStatusText(scene)}
                     </span>
                   </div>
                   
-                  {scene.generationStatus === 'completed' && scene.videoUrl && (
-                    <a
-                      href={scene.videoUrl}
-                      download
-                      className="p-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-green-400 transition-colors border border-green-500/30"
-                      title="Descargar video"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
-                  )}
-                  
-                  {scene.generationStatus !== 'generating' && (
-                    <Button
-                      onClick={() => handleRegenerateVideo(scene.id)}
-                      size="sm"
-                      variant="outline"
-                      className="text-indigo-300 border-indigo-500/50 hover:border-indigo-400 hover:bg-indigo-500/10"
-                    >
-                      <RefreshCw className="w-4 h-4 mr-1" />
-                      {scene.generationStatus === 'completed' ? 'Regenerar' : 'Generar'}
-                    </Button>
-                  )}
+                  <div className="flex items-center space-x-2">
+                    {editingSceneId === scene.id ? (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          onClick={() => handleEditSave(scene.id)}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1"
+                        >
+                          Guardar
+                        </Button>
+                        <Button
+                          onClick={handleEditCancel}
+                          variant="outline"
+                          size="sm"
+                          className="text-slate-400 border-slate-600 hover:bg-slate-700 text-xs px-3 py-1"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          onClick={() => handleEditStart(scene)}
+                          variant="outline"
+                          size="sm"
+                          className="text-slate-400 border-slate-600 hover:bg-slate-700 text-xs px-3 py-1"
+                        >
+                          <Edit3 className="w-3 h-3 mr-1" />
+                          <span className="hidden sm:inline">Editar</span>
+                        </Button>
+                        
+                        {scene.generationStatus === 'completed' && (
+                          <Button
+                            onClick={() => handleRegenerateVideo(scene.id)}
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-400 border-blue-600/50 hover:bg-blue-600/20 text-xs px-3 py-1"
+                          >
+                            <RefreshCw className="w-3 h-3 mr-1" />
+                            <span className="hidden sm:inline">Regenerar</span>
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Scene Description */}
-              <div className="space-y-3">
+              <div>
                 {editingSceneId === scene.id ? (
                   <div className="space-y-3">
+                    <label className="block text-sm font-medium text-slate-300">
+                      Descripción de la Escena:
+                    </label>
                     <textarea
                       value={editedDescription}
                       onChange={(e) => setEditedDescription(e.target.value)}
-                      className="w-full p-4 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                      rows={4}
-                      placeholder="Describe esta escena..."
+                      className="w-full h-24 sm:h-32 p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-sm"
+                      placeholder="Describe cómo quieres que se vea esta escena..."
                     />
-                    <div className="flex space-x-2">
-                      <Button
-                        onClick={() => handleEditSave(scene.id)}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        Guardar Cambios
-                      </Button>
-                      <Button
-                        onClick={handleEditCancel}
-                        size="sm"
-                        variant="outline"
-                        className="text-slate-300 border-slate-600"
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
                   </div>
                 ) : (
-                  <div className="group relative">
-                    <div className="bg-slate-700/30 border border-slate-600/50 rounded-lg p-4">
-                      <p className="text-white leading-relaxed text-sm">
-                        {getSceneDescription(scene.description)}
-                      </p>
-                    </div>
-                    {scene.isEdited && (
-                      <span className="inline-block mt-2 px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded">
-                        Editado
-                      </span>
-                    )}
-                    <Button
-                      onClick={() => handleEditStart(scene)}
-                      size="sm"
-                      variant="ghost"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </Button>
+                  <div className="bg-slate-700/30 rounded-lg p-3 sm:p-4 border border-slate-600/30">
+                    <p className="text-slate-200 text-sm sm:text-base leading-relaxed whitespace-pre-wrap">
+                      {getSceneDescription(scene.description)}
+                    </p>
                   </div>
                 )}
               </div>
-
-              {/* Progress Bar for Generating Scenes */}
-              {scene.generationStatus === 'generating' && scene.videoProgress !== undefined && (
-                <div className="space-y-2">
-                  <div className="w-full bg-slate-600/50 rounded-full h-3 border border-slate-500/30">
-                    <div
-                      className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-300 shadow-sm"
-                      style={{ width: `${scene.videoProgress}%` }}
-                    />
-                  </div>
-                  <p className="text-sm text-indigo-300 text-center font-medium">
-                    {scene.videoProgress}% completado
-                  </p>
-                </div>
-              )}
-
-              {/* Video Preview */}
-              {scene.generationStatus === 'completed' && scene.videoUrl && (
-                <div className="mt-4 p-4 bg-slate-700/30 border border-slate-600/50 rounded-lg">
-                  <video
-                    src={scene.videoUrl}
-                    controls
-                    className="w-full max-w-md mx-auto rounded-lg border border-slate-500/30"
-                    poster="/video-placeholder.jpg"
-                  >
-                    Tu navegador no soporta la reproducción de video.
-                  </video>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {scene.generationStatus === 'failed' && scene.errorMessage && (
-                <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <p className="text-red-300 text-sm font-medium">{scene.errorMessage}</p>
-                </div>
-              )}
             </div>
           </Card>
         ))}

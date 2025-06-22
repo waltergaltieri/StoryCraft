@@ -90,6 +90,118 @@ Genera un prompt técnicamente detallado que maximice la calidad visual y la efe
   return MASTER_PROMPT_ENGINEERING + contextualInfo;
 }
 
+// Nueva función para regeneración contextual de escenas individuales
+export function generateContextualScenePrompt(
+  sceneToRegenerate: {
+    id: string;
+    description: string;
+    sceneNumber: number;
+  },
+  projectContext: {
+    objective: string;
+    tone: string;
+    style: string;
+    duration: number;
+    description: string;
+    projectTitle: string;
+  },
+  allScenes: Array<{
+    id: string;
+    description: string;
+    sceneNumber: number;
+    isTarget: boolean;
+  }>,
+  aspectRatio: '16:9' | '9:16' = '16:9'
+): string {
+  
+  const contextualInfo = `
+REGENERACIÓN CONTEXTUAL DE ESCENA INDIVIDUAL
+
+CONTEXTO COMPLETO DEL PROYECTO:
+- Título del Proyecto: ${projectContext.projectTitle}
+- Objetivo General: ${projectContext.objective}
+- Tono Narrativo: ${projectContext.tone}
+- Estilo Visual: ${projectContext.style}
+- Duración Total: ${projectContext.duration} segundos
+- Descripción del Proyecto: ${projectContext.description}
+
+ESCENA A REGENERAR:
+- Número de Escena: ${sceneToRegenerate.sceneNumber}
+- Descripción Actual: ${sceneToRegenerate.description}
+
+CONTEXTO NARRATIVO COMPLETO:
+${allScenes.map(scene => 
+  scene.isTarget 
+    ? `📍 ESCENA ${scene.sceneNumber} [REGENERAR]: ${scene.description}`
+    : `Escena ${scene.sceneNumber}: ${scene.description}`
+).join('\n')}
+
+INSTRUCCIONES CRÍTICAS PARA REGENERACIÓN:
+
+1. COHERENCIA NARRATIVA:
+   - La escena ${sceneToRegenerate.sceneNumber} DEBE mantener continuidad visual y narrativa con las escenas anterior y posterior
+   - Respetar la progresión lógica del mensaje desde la escena 1 hasta la final
+   - Mantener consistencia en elementos visuales (personajes, entorno, iluminación base)
+
+2. CONSISTENCIA DE PROYECTO:
+   - Objetivo "${projectContext.objective}": La escena debe contribuir específicamente a este objetivo
+   - Tono "${projectContext.tone}": Mantener el mismo tono emocional y comunicativo
+   - Estilo "${projectContext.style}": Conservar la estética visual establecida
+
+3. TRANSICIONES FLUIDAS:
+   - Si hay escena anterior: crear conexión visual/narrativa suave
+   - Si hay escena posterior: preparar elementos que faciliten la transición
+   - Evitar cambios abruptos de locación, personajes, o elementos visuales principales
+
+4. ELEMENTOS A PRESERVAR:
+   - Personajes principales si aparecen en otras escenas
+   - Esquema de colores y paleta visual del proyecto
+   - Estilo de iluminación predominante
+   - Elementos de marca o productos si son relevantes
+
+5. OPTIMIZACIÓN TÉCNICA:
+   - Duración: ${Math.round(projectContext.duration / allScenes.length)} segundos aproximadamente
+   - Aspect Ratio: ${aspectRatio}
+   - Calidad: 4K, broadcast quality
+   - Estilo específico: ${getStyleSpecificOptimizations(projectContext.style)}
+
+PROMPT DE ESCENA A OPTIMIZAR:
+${sceneToRegenerate.description}
+
+OBJETIVO DE LA REGENERACIÓN:
+Crear una versión mejorada de la Escena ${sceneToRegenerate.sceneNumber} que:
+- Mantenga perfecta coherencia con el resto del proyecto
+- Mejore la calidad visual y narrativa de la escena específica
+- Preserve la linealidad y flujo narrativo del video completo
+- Optimice técnicamente para máxima calidad de generación
+`;
+
+  return MASTER_PROMPT_ENGINEERING + contextualInfo;
+}
+
+// Función auxiliar para detectar elementos comunes entre escenas
+export function analyzeSceneConsistency(scenes: Array<{description: string, sceneNumber: number}>) {
+  // Análisis básico de elementos comunes
+  const commonElements = {
+    characters: [] as string[],
+    locations: [] as string[],
+    objects: [] as string[],
+    themes: [] as string[]
+  };
+
+  // Aquí podrías implementar análisis más sofisticado con NLP
+  // Por ahora, retornamos estructura básica para extensión futura
+  
+  return {
+    commonElements,
+    suggestions: [
+      "Mantener consistencia visual entre escenas",
+      "Preservar elementos de transición",
+      "Conservar paleta de colores establecida"
+    ]
+  };
+}
+
 export const TECHNICAL_PARAMETERS = {
   QUALITY_PRESETS: {
     ultra: 'ultra high quality, 4K resolution, professional broadcast quality, cinematic production value',

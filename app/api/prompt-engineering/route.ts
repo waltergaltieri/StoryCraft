@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { config } from '@/lib/config';
+import { generateOptimizedPrompt, generateContextualScenePrompt } from '@/lib/prompt-engineering';
 
 // Request types
 interface PromptEngineeringRequest {
   scene: string;
+  regenerationMode?: boolean;
+  sceneToRegenerate?: any;
+  projectContext?: any;
+  allScenes?: any[];
+  contextualPrompt?: string;
 }
 
 // Response types
@@ -44,164 +50,253 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
   
   try {
-    // Validate request body
-    const body: PromptEngineeringRequest = await request.json();
+    const body = await request.json();
+    const { type, scene, regenerationMode, sceneToRegenerate, projectContext, allScenes, contextualPrompt, campaignDescription, objective, scheduledDate, socialNetworks, videoNumber, totalVideosInWeek } = body;
+
+    console.log('🔧 Prompt Engineering API called');
     
-    if (!body.scene || typeof body.scene !== 'string' || body.scene.trim().length === 0) {
-      return NextResponse.json(
-        { 
-          error: 'Validation Error',
-          message: 'Scene description is required and must be a non-empty string'
-        } as ErrorResponse,
-        { status: 400 }
-      );
-    }
-
-    // Validate scene length (reasonable limits)
-    if (body.scene.length > 2000) {
-      return NextResponse.json(
-        { 
-          error: 'Validation Error',
-          message: 'Scene description is too long (max 2000 characters)'
-        } as ErrorResponse,
-        { status: 400 }
-      );
-    }
-
-    // Create the correct prompt for Veo 3 format conversion
-    const finalPrompt = `Actúa como un especialista en prompt engineering para Veo 3. Tu tarea es convertir la descripción detallada de una escena en un prompt técnico optimizado para generación de video con IA.
-
-Recibirás la siguiente descripción estructurada de escena:
-
-${body.scene.trim()}
-
-Debes convertirla al formato exacto de Veo 3 siguiendo esta estructura:
-
-[Establishing shot]: [Descripción específica del encuadre inicial y tipo de plano]
-
-[Subject details + environment]: [Descripción completa de TODOS los sujetos (personas, animales, objetos) y entorno en inglés, manteniendo todos los detalles físicos, características y elementos del ambiente]
-
-[Energy/mood]: [Atmósfera y energía específica de la escena]
-
-[Environment details]: [Detalles precisos del entorno, iluminación ambiental, elementos decorativos, música y efectos de sonido]
-
-[Subject action description]: [Descripción exacta de las acciones de TODOS los sujetos paso a paso]
-
-[Dialogue]: 
-- Si hay diálogos: (Speaking with [tone description]. The following dialogue MUST BE spoken in Spanish:) "[diálogo exacto en español entre comillas dobles]"
-- Si no hay diálogos: There is no dialogue in this scene.
-
-[Lighting]: [Especificaciones técnicas de iluminación, dirección y calidad de luz]
-
-[Style]: [Estilo cinematográfico específico con referencias técnicas de cámara y movimiento]
-
-INSTRUCCIONES CRÍTICAS:
-- TODO el prompt debe estar en inglés EXCEPTO los diálogos específicos
-- Los diálogos deben estar en español y entre comillas dobles ""
-- Mantén TODOS los detalles de la descripción original
-- Adapta la descripción a lo que realmente aparece en la escena (personas, objetos, animales, etc.)
-- Usa terminología cinematográfica técnica específica
-- Sé extremadamente específico con colores, texturas, y elementos visuales
-- Mantén la consistencia visual exactamente como se describe
-
-IMPORTANTE: Genera ÚNICAMENTE el prompt optimizado para Veo 3. No agregues texto adicional antes o después del prompt.`;
-
-    // Prepare OpenAI request
-    const openAIRequest: OpenAIRequest = {
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: 'Eres un especialista experto en prompt engineering para Veo 3. Tu única tarea es convertir descripciones de escenas al formato técnico específico requerido por Veo 3. Debes seguir EXACTAMENTE la estructura con las secciones marcadas entre **[corchetes]** y mantener todos los detalles de la escena original. Responde ÚNICAMENTE con el prompt formateado, sin texto adicional.'
-        },
-        {
-          role: 'user',
-          content: finalPrompt
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.3 // Lower temperature for more consistent, precise prompts
-    };
-
-    // Call OpenAI API
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.openaiApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(openAIRequest)
-    });
-
-    if (!openAIResponse.ok) {
-      const errorData = await openAIResponse.text();
-      console.error('OpenAI API Error:', errorData);
+    // Manejar generación de descripción de campaña
+    if (type === 'campaign_video_description') {
+      console.log('📝 Generando descripción específica para video de campaña');
       
-      return NextResponse.json(
-        { 
-          error: 'OpenAI API Error',
-          message: `Failed to optimize prompt: ${openAIResponse.status} ${openAIResponse.statusText}`,
-          code: 'OPENAI_API_FAILED'
-        } as ErrorResponse,
-        { status: 500 }
+      const specificDescription = await generateCampaignVideoDescription(
+        campaignDescription,
+        objective,
+        scheduledDate,
+        socialNetworks,
+        videoNumber,
+        totalVideosInWeek
       );
+
+      return NextResponse.json({
+        success: true,
+        description: specificDescription,
+        type: 'campaign_video_description'
+      });
     }
-
-    const openAIData: OpenAIResponse = await openAIResponse.json();
-    const optimizedPrompt = openAIData.choices[0]?.message?.content;
-
-    if (!optimizedPrompt) {
-      return NextResponse.json(
-        { 
-          error: 'Generation Error',
-          message: 'No optimized prompt generated by AI'
-        } as ErrorResponse,
-        { status: 500 }
+    
+    // Detectar si es regeneración contextual o optimización normal
+    if (regenerationMode && contextualPrompt && sceneToRegenerate && projectContext && allScenes) {
+      console.log(`🧠 Modo regeneración contextual para Escena ${sceneToRegenerate.sceneNumber}`);
+      console.log(`📋 Proyecto: ${projectContext.projectTitle}`);
+      console.log(`🎯 Manteniendo coherencia con ${allScenes.length} escenas totales`);
+      
+      // Usar la nueva función de regeneración contextual
+      const contextualPrompt = generateContextualScenePrompt(
+        sceneToRegenerate,
+        projectContext,
+        allScenes
       );
-    }
 
-    // Clean up the optimized prompt
-    const cleanedPrompt = optimizedPrompt
-      .trim()
-      .replace(/^["']|["']$/g, '') // Remove quotes at start/end
-      .replace(/\n\s*\n/g, '\n') // Remove extra blank lines
-      .replace(/\s+/g, ' '); // Normalize whitespace
-
-    // Validate the optimized prompt length
-    if (cleanedPrompt.length < 10) {
-      return NextResponse.json(
-        { 
-          error: 'Generation Error',
-          message: 'Generated prompt is too short to be useful'
-        } as ErrorResponse,
-        { status: 500 }
+      console.log(`✨ Prompt contextual generado (${contextualPrompt.length} caracteres)`);
+      
+      // En un entorno real, aquí llamarías a tu modelo de IA (OpenAI, Anthropic, etc.)
+      // Por ahora, simulamos una optimización inteligente
+      const optimizedPrompt = await simulateContextualPromptOptimization(
+        contextualPrompt,
+        sceneToRegenerate,
+        projectContext,
+        allScenes
       );
+
+      return NextResponse.json({
+        success: true,
+        optimizedPrompt,
+        mode: 'contextual-regeneration',
+        sceneNumber: sceneToRegenerate.sceneNumber,
+        projectTitle: projectContext.projectTitle
+      });
+      
+    } else {
+      // Modo normal de optimización de prompt
+      console.log('📝 Modo optimización normal de prompt');
+      
+      if (!scene) {
+        return NextResponse.json(
+          { error: 'Scene description is required' },
+          { status: 400 }
+        );
+      }
+
+      // Default values for normal optimization
+      const defaultOptimization = generateOptimizedPrompt(
+        scene,
+        'presentar-producto', // objective
+        'profesional',        // tone
+        'cinematografico',    // style
+        8                     // duration
+      );
+
+      // Simular optimización de prompt
+      const optimizedPrompt = await simulatePromptOptimization(defaultOptimization);
+
+      return NextResponse.json({
+        success: true,
+        optimizedPrompt,
+        mode: 'normal-optimization'
+      });
     }
-
-    const processingTime = Date.now() - startTime;
-
-    const response: PromptEngineeringResponse = {
-      optimizedPrompt: cleanedPrompt,
-      originalScene: body.scene,
-      processingTime
-    };
-
-    return NextResponse.json(response);
 
   } catch (error) {
-    console.error('Prompt Engineering API Error:', error);
-    
-    const processingTime = Date.now() - startTime;
-    
+    console.error('Error in prompt engineering:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal Server Error',
-        message: error instanceof Error ? error.message : 'An unexpected error occurred',
-        processingTime
-      } as ErrorResponse & { processingTime: number },
+      { error: 'Failed to optimize prompt' },
       { status: 500 }
     );
   }
+}
+
+// Simulación de optimización contextual (en producción usarías IA real)
+async function simulateContextualPromptOptimization(
+  contextualPrompt: string,
+  sceneToRegenerate: any,
+  projectContext: any,
+  allScenes: any[]
+): Promise<string> {
+  // Simular delay de IA
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  // Construir prompt optimizado con contexto
+  const sceneNumber = sceneToRegenerate.sceneNumber;
+  const totalScenes = allScenes.length;
+  const style = projectContext.style;
+  const tone = projectContext.tone;
+  
+  // Determinar elementos de continuidad basados en posición de la escena
+  let continuityElements = '';
+  
+  if (sceneNumber === 1) {
+    continuityElements = 'Opening establishing shot, introduce main elements, set visual tone for entire video';
+  } else if (sceneNumber === totalScenes) {
+    continuityElements = 'Concluding shot, maintain visual consistency from previous scenes, provide satisfying closure';
+  } else {
+    continuityElements = 'Maintain visual continuity from previous scene, prepare transition elements for next scene';
+  }
+
+  // Adaptaciones específicas por estilo
+  const styleAdaptations = {
+    'cinematografico': 'cinematic lighting setup, film grain texture, shallow depth of field, professional color grading',
+    'influencer': 'natural authentic lighting, relatable environment, casual professional quality',
+    'comercial': 'perfect studio lighting, commercial polish, brand-appropriate visual style',
+    'sketch': 'dynamic comedic staging, expressive visual elements, vibrant engaging colors',
+    'documental': 'documentary realism, natural lighting conditions, authentic environment',
+    'tutorial': 'clear instructional lighting, optimal visibility, clean presentation style'
+  };
+
+  const toneAdaptations = {
+    'profesional': 'authoritative confident presentation, polished professional atmosphere',
+    'divertido': 'energetic playful mood, bright engaging visuals, dynamic movement',
+    'directo': 'clean straightforward composition, focused clear messaging',
+    'inspiracional': 'uplifting motivated energy, aspirational visual elements'
+  };
+
+  // Construir prompt optimizado final
+  const optimizedPrompt = `
+Professional ${style} style video, ${continuityElements}, 
+${sceneToRegenerate.description}, 
+maintaining project consistency: ${styleAdaptations[style as keyof typeof styleAdaptations] || styleAdaptations['comercial']}, 
+${toneAdaptations[tone as keyof typeof toneAdaptations] || toneAdaptations['profesional']},
+smooth camera movement, 4K resolution, broadcast quality,
+scene ${sceneNumber} of ${totalScenes}, 
+${Math.round(projectContext.duration / totalScenes)} seconds duration,
+seamless integration with project narrative flow
+`.replace(/\s+/g, ' ').trim();
+
+  console.log(`🎬 Prompt optimizado contextualmente para Escena ${sceneNumber}:`);
+  console.log(`📝 "${optimizedPrompt.substring(0, 100)}..."`);
+
+  return optimizedPrompt;
+}
+
+// Simulación de optimización normal
+async function simulatePromptOptimization(basePrompt: string): Promise<string> {
+  // Simular delay de IA
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  // En producción, aquí enviarías el prompt a tu modelo de IA preferido
+  // Por ahora, devolvemos una versión "optimizada" simulada
+  const optimizedPrompt = `Professional commercial style, medium shot, ${basePrompt.toLowerCase()}, modern studio lighting, smooth camera movement, 4K resolution, broadcast quality, 8 seconds duration`;
+
+  return optimizedPrompt;
+}
+
+// Generar descripción específica para video de campaña
+async function generateCampaignVideoDescription(
+  campaignDescription: string,
+  objective: string,
+  scheduledDate: string,
+  socialNetworks: string,
+  videoNumber: number,
+  totalVideosInWeek: number
+): Promise<string> {
+  // Simular delay de IA
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Convertir fecha a formato legible
+  const date = new Date(scheduledDate);
+  const dateStr = date.toLocaleDateString('es-ES', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  // Lugares y escenarios variados
+  const locations = [
+    'playa paradisíaca con aguas cristalinas',
+    'ciudad moderna con rascacielos',
+    'bosque encantado con luz natural',
+    'montañas majestuosas al amanecer',
+    'café acogedor en el centro de la ciudad',
+    'estudio minimalista con luz natural',
+    'parque urbano con vegetación exuberante',
+    'terraza con vista panorámica',
+    'galería de arte contemporáneo',
+    'mercado local vibrante y colorido',
+    'biblioteca elegante con arquitectura clásica',
+    'gimnasio moderno con equipamiento avanzado',
+    'cocina gourmet con diseño industrial',
+    'jardín botánico con flores exóticas',
+    'centro comercial de lujo',
+    'oficina corporativa con vista a la ciudad',
+    'estación de tren histórica',
+    'museo de ciencias interactivo',
+    'teatro clásico con decoración vintage',
+    'plaza principal de ciudad europea'
+  ];
+
+  // Actividades y contextos
+  const activities = [
+    'personas disfrutando del ambiente relajado',
+    'profesionales trabajando de manera eficiente',
+    'familias compartiendo momentos especiales',
+    'jóvenes explorando nuevas experiencias',
+    'artistas creando obras inspiradoras',
+    'deportistas entrenando con dedicación',
+    'estudiantes aprendiendo con entusiasmo',
+    'turistas descubriendo lugares únicos',
+    'emprendedores desarrollando ideas innovadoras',
+    'amigos celebrando logros importantes'
+  ];
+
+  // Seleccionar elementos basados en el número de video para variedad
+  const locationIndex = (videoNumber - 1) % locations.length;
+  const activityIndex = (videoNumber - 1) % activities.length;
+  
+  const selectedLocation = locations[locationIndex];
+  const selectedActivity = activities[activityIndex];
+
+  // Extraer producto de la descripción de campaña
+  const productMatch = campaignDescription.match(/producto[_\s]?(\w+)/i);
+  const product = productMatch ? productMatch[0] : 'nuestro producto';
+
+  // Generar descripción específica
+  const specificDescription = `Crea un video del ${product} en ${selectedLocation} donde el producto sea el protagonista principal mientras ${selectedActivity}. El video debe transmitir ${objective.toLowerCase()} y estar optimizado para ${socialNetworks}. La escena debe ser visualmente atractiva y mostrar el producto de manera natural e integrada en el ambiente, programado para ${dateStr}.`;
+
+  console.log(`📝 Descripción generada para video ${videoNumber}/${totalVideosInWeek}:`);
+  console.log(`🎬 "${specificDescription.substring(0, 100)}..."`);
+
+  return specificDescription;
 }
 
 export async function GET(): Promise<NextResponse> {

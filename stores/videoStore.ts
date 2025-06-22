@@ -24,6 +24,14 @@ export interface EnhancedScene extends Scene {
   aimlJobId?: string;
   optimizedPrompt?: string;
   localVideoPath?: string;
+  // New fields for better error handling and retry logic
+  errorType?: string;
+  canRetry?: boolean;
+  isStuck?: boolean;
+  retryCount?: number;
+  lastPolledAt?: string;
+  completedAt?: string;
+  lastRetryAt?: string;
 }
 
 export interface VideoProject {
@@ -46,6 +54,68 @@ export interface VideoProject {
 
 export type CreationStep = 'selection' | 'script-generation' | 'scene-editing' | 'video-generation' | 'concatenating' | 'completed';
 
+// Interfaces para campañas
+export interface Campaign {
+  id: string;
+  name: string;
+  objective: string;
+  tone: string;
+  style: string;
+  duration: number;
+  campaignDescription: string;
+  status: 'active' | 'paused' | 'completed' | 'archived';
+  scheduledDays: string[];
+  scheduledTimes: string[];
+  socialNetworks: string[];
+  startDate: string;
+  endDate?: string;
+  totalVideos: number;
+  generatedVideos: number;
+  publishedVideos: number;
+  createdAt: string;
+  constants: {
+    watermark?: string;
+    brandElements?: string[];
+    recurringPersons?: string[];
+  };
+  contentPlan: WeeklyContentPlan[];
+}
+
+export interface WeeklyContentPlan {
+  weekNumber: number;
+  startDate: string;
+  endDate: string;
+  videos: CampaignVideo[];
+}
+
+export interface CampaignVideo {
+  id: string;
+  title: string;
+  description: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  socialNetworks: string[];
+  status: 'scheduled' | 'generating' | 'generated' | 'published' | 'failed';
+  videoUrl?: string;
+  scenes: EnhancedScene[];
+  generatedTitle?: string;
+  generatedDescription?: string;
+  publishedAt?: string;
+}
+
+// Nueva interfaz para imágenes subidas
+export interface UploadedImage {
+  id: string;
+  file: File;
+  preview: string; // URL para preview
+  type: 'persona' | 'objeto' | 'entorno';
+  tag: string; // Ej: "Personaje_1", "Objeto_1", "Entorno_1"
+  description?: string; // Descripción generada por IA
+  isAnalyzing?: boolean; // Estado de análisis
+  analysisError?: string; // Error en análisis
+  uploadedAt: Date;
+}
+
 interface VideoStore {
   // Authentication
   user: User | null;
@@ -56,6 +126,10 @@ interface VideoStore {
   // Video Projects History
   projects: VideoProject[];
   currentProject: VideoProject | null;
+  
+  // Campaigns
+  campaigns: Campaign[];
+  currentCampaign: Campaign | null;
   
   // Current creation flow
   currentStep: CreationStep;
@@ -69,6 +143,18 @@ interface VideoStore {
   isLoading: boolean;
   error: string | null;
   concatenationProgress: number; // Progreso de concatenación
+  
+  // Image management
+  uploadedImages: UploadedImage[];
+  maxImages: number;
+  
+  // OpenAI quota status
+  openaiQuotaStatus: {
+    hasQuota: boolean;
+    message: string;
+    mode: 'ai' | 'fallback' | 'uncertain';
+    lastChecked: Date | null;
+  };
 
   // Actions
   setCurrentStep: (step: CreationStep) => void;
@@ -106,6 +192,41 @@ interface VideoStore {
 
   // Reset
   reset: () => void;
+
+  // New functions
+  retrySceneGeneration: (sceneId: string, retryType?: 'same-prompt' | 'regenerate-prompt' | 'force-new') => Promise<void>;
+  diagnoseSceneIssue: (sceneId: string) => Promise<any>;
+  
+  // Emergency functions
+  stopAllPolling: () => void;
+  forceStopGeneratingScenes: () => void;
+  
+  // Image management functions
+  uploadImage: (file: File, type: 'persona' | 'objeto' | 'entorno') => Promise<void>;
+  removeImage: (imageId: string) => void;
+  analyzeImageWithAI: (imageId: string) => Promise<void>;
+  insertImageTag: (tag: string, position: number) => void;
+  replaceTagsInDescription: (text: string) => string;
+  fileToBase64: (file: File) => Promise<string>;
+  
+  // OpenAI quota management
+  checkOpenAIQuota: () => Promise<void>;
+  setQuotaStatus: (status: { hasQuota: boolean; message: string; mode: 'ai' | 'fallback' | 'uncertain' }) => void;
+  
+  // Campaign management
+  createCampaign: (campaignData: Omit<Campaign, 'id' | 'createdAt' | 'generatedVideos' | 'publishedVideos' | 'contentPlan'>) => Promise<void>;
+  updateCampaign: (campaignId: string, updates: Partial<Campaign>) => void;
+  deleteCampaign: (campaignId: string) => void;
+  pauseCampaign: (campaignId: string) => void;
+  resumeCampaign: (campaignId: string) => void;
+  archiveCampaign: (campaignId: string) => void;
+  generateCampaignContent: (campaignId: string) => Promise<void>;
+  generateVideoDescriptions: (campaignId: string) => Promise<void>;
+  generateSpecificVideoDescription: (campaignDescription: string, objective: string, scheduledDate: string, socialNetworks: string[], videoNumber: number, totalVideosInWeek: number) => Promise<string>;
+  regenerateVideoDescription: (campaignId: string, videoId: string) => Promise<void>;
+  generateCampaignVideo: (campaignId: string, videoId: string) => Promise<void>;
+  simulatePublishVideo: (campaignId: string, videoId: string) => Promise<void>;
+  downloadCampaignVideo: (campaignId: string, videoId: string) => void;
 }
 
 const useVideoStore = create<VideoStore>()(
@@ -131,9 +252,13 @@ const useVideoStore = create<VideoStore>()(
         get().reset();
       },
 
-      // Video Projects
-      projects: [],
-      currentProject: null,
+        // Video Projects
+  projects: [],
+  currentProject: null,
+  
+  // Campaigns
+  campaigns: [],
+  currentCampaign: null,
 
       // Current creation state
       currentStep: 'selection',
@@ -145,8 +270,20 @@ const useVideoStore = create<VideoStore>()(
       description: '',
       scenes: [],
       isLoading: false,
-      error: null,
-      concatenationProgress: 0,
+        error: null,
+  concatenationProgress: 0,
+  
+  // Image management
+  uploadedImages: [],
+  maxImages: 10,
+  
+  // OpenAI quota status
+  openaiQuotaStatus: {
+    hasQuota: true,
+    message: 'No verificado',
+    mode: 'ai',
+    lastChecked: null
+  },
 
       // Actions
       setCurrentStep: (step) => set({ currentStep: step }),
@@ -326,12 +463,26 @@ const useVideoStore = create<VideoStore>()(
         set({ isLoading: true, error: null, currentStep: 'script-generation' });
 
         try {
+          // Reemplazar tags con descripciones de imágenes
+          const processedDescription = get().replaceTagsInDescription(description);
+          
+          console.log('🎬 Generando guión con parámetros:', {
+            objective,
+            tone,
+            style,
+            duration,
+            originalDescription: description?.substring(0, 100) + '...',
+            processedDescription: processedDescription?.substring(0, 100) + '...',
+            hasImageTags: description !== processedDescription,
+            uploadedImages: get().uploadedImages.length
+          });
+
           const response = await axios.post('/api/filmmaker', {
             objective,
             tone,
             style,
             duration,
-            description
+            description: processedDescription // Usar descripción procesada
           });
 
           const scenesData = response.data.scenes || [];
@@ -407,12 +558,56 @@ const useVideoStore = create<VideoStore>()(
         set({ scenes: updatedScenes });
 
         try {
-          // Step 1: Optimize prompt for video generation
+          // 🧠 REGENERACIÓN CONTEXTUAL INTELIGENTE
+          // Preparar contexto completo del proyecto para mantener coherencia
+          const currentProject = get().currentProject;
+          const { objective, tone, style, duration, description, projectName } = get();
+          
+          const sceneToRegenerate = {
+            id: sceneId,
+            description: typeof scenes[sceneIndex].description === 'string' 
+              ? scenes[sceneIndex].description 
+              : JSON.stringify(scenes[sceneIndex].description),
+            sceneNumber: sceneIndex + 1
+          };
+
+          const projectContext = {
+            objective,
+            tone,
+            style,
+            duration,
+            description,
+            projectTitle: projectName || currentProject?.title || 'Video Project'
+          };
+
+          const allScenes = scenes.map((scene, index) => ({
+            id: scene.id,
+            description: typeof scene.description === 'string' 
+              ? scene.description 
+              : JSON.stringify(scene.description),
+            sceneNumber: index + 1,
+            isTarget: scene.id === sceneId
+          }));
+
+          console.log(`🧠 Regenerando Escena ${sceneIndex + 1} con contexto completo del proyecto:`);
+          console.log(`📋 Proyecto: "${projectContext.projectTitle}"`);
+          console.log(`🎯 Objetivo: ${objective} | Tono: ${tone} | Estilo: ${style}`);
+          console.log(`📚 Total escenas: ${scenes.length} | Regenerando: Escena ${sceneIndex + 1}`);
+
+          // Step 1: Generar prompt contextual que mantiene coherencia narrativa
           const promptResponse = await axios.post('/api/prompt-engineering', {
-            scene: scenes[sceneIndex].description
+            scene: sceneToRegenerate.description,
+            regenerationMode: true,
+            sceneToRegenerate,
+            projectContext,
+            allScenes,
+            contextualPrompt: true
           });
 
           const optimizedPrompt = promptResponse.data.optimizedPrompt;
+          
+          console.log(`✨ Prompt contextual generado para Escena ${sceneIndex + 1}`);
+          console.log(`📝 Longitud del prompt: ${optimizedPrompt.length} caracteres`);
           
           // Update scene with optimized prompt
           updatedScenes[sceneIndex] = {
@@ -422,16 +617,24 @@ const useVideoStore = create<VideoStore>()(
           };
           set({ scenes: [...updatedScenes] });
 
-          // Step 2: Generate video with Veo 3 (KieAI)
+          // Step 2: Generate video with Veo 3 (KieAI) usando prompt contextual
           const videoResponse = await axios.post('/api/generate-video', {
             prompt: optimizedPrompt,
-            duration: 8,
-            enhancePrompt: true,
-            generateAudio: true
+            duration: Math.round(duration / scenes.length), // Duración proporcional
+            enhancePrompt: false, // Ya está optimizado contextualmente
+            generateAudio: true,
+            sceneContext: {
+              sceneNumber: sceneIndex + 1,
+              totalScenes: scenes.length,
+              isRegeneration: true,
+              projectStyle: style
+            }
           });
 
           if (videoResponse.data.generationId) {
             const generationId = videoResponse.data.generationId;
+            
+            console.log(`🎬 Iniciando generación de video para Escena ${sceneIndex + 1} con ID: ${generationId}`);
             
             // Update scene with generation ID
             updatedScenes[sceneIndex] = {
@@ -448,7 +651,7 @@ const useVideoStore = create<VideoStore>()(
           }
 
         } catch (error: any) {
-          console.error(`Error generating video for scene ${sceneId}:`, error);
+          console.error(`❌ Error regenerando video para Escena ${sceneIndex + 1}:`, error);
           
           // Update scene status to failed
           updatedScenes[sceneIndex] = {
@@ -462,20 +665,52 @@ const useVideoStore = create<VideoStore>()(
       },
 
       pollVideoStatus: async (sceneId: string) => {
-        // Get initial scene info
         const initialScene = get().scenes.find(s => s.id === sceneId);
-        if (!initialScene?.aimlJobId) return;
+        if (!initialScene || !initialScene.aimlJobId) {
+          console.error('Scene not found or missing aimlJobId:', sceneId);
+          return;
+        }
 
-        const maxAttempts = 30; // 5 minutes max
+        console.log(`📊 Starting polling for scene ${sceneId} with aimlJobId: ${initialScene.aimlJobId}`);
+
+        const maxAttempts = 40; // Reducido a 6.7 minutos máximo
         let attempts = 0;
+        let consecutiveErrors = 0;
+        let lastStatus = 'generating';
+        let stuckAtProgressCount = 0;
+        let lastProgress = 0;
+        let isPollingActive = true; // 🚨 CONTROL DE PARADA
 
         const poll = async (): Promise<void> => {
-          if (attempts >= maxAttempts) {
-            // Update scene status to failed - use fresh scenes state
+          // 🚨 MÚLTIPLES CONDICIONES DE PARADA
+          if (!isPollingActive || attempts >= maxAttempts || stuckAtProgressCount > 8) {
+            isPollingActive = false; // Detener polling
+            
+            // Determinar el tipo de error basado en la situación
+            let errorType = 'TIMEOUT';
+            let errorMessage = 'Tiempo de espera agotado - polling detenido para evitar consumo excesivo';
+            
+            if (consecutiveErrors > 3) {
+              errorType = 'CONNECTION_ERROR';
+              errorMessage = 'Problemas de conexión - polling detenido';
+            } else if (stuckAtProgressCount > 8) {
+              errorType = 'PROGRESS_STUCK';
+              errorMessage = 'Generación atascada - polling detenido para prevenir bucle infinito';
+            }
+
+            console.log(`🛑 POLLING DETENIDO para scene ${sceneId}: ${errorMessage}`);
+
             const currentScenes = get().scenes;
             const updatedScenes = currentScenes.map(s =>
               s.id === sceneId
-                ? { ...s, generationStatus: 'failed' as const, errorMessage: 'Generation timeout' }
+                ? { 
+                    ...s, 
+                    generationStatus: 'failed' as const, 
+                    errorMessage,
+                    errorType,
+                    canRetry: true,
+                    lastPolledAt: new Date().toISOString()
+                  }
                 : s
             );
             set({ scenes: updatedScenes });
@@ -485,8 +720,10 @@ const useVideoStore = create<VideoStore>()(
           try {
             const response = await axios.get(`/api/poll-video?generationId=${initialScene.aimlJobId}`);
             
+            // Reset consecutive errors on successful response
+            consecutiveErrors = 0;
+            
             if (response.data.status === 'completed' && response.data.videoUrl) {
-              // Update scene with completed video - use fresh scenes state
               const currentScenes = get().scenes;
               const updatedScenes = currentScenes.map(s =>
                 s.id === sceneId
@@ -494,7 +731,10 @@ const useVideoStore = create<VideoStore>()(
                       ...s, 
                       generationStatus: 'completed' as const,
                       videoUrl: response.data.videoUrl,
-                      videoProgress: 100
+                      videoProgress: 100,
+                      completedAt: new Date().toISOString(),
+                      errorType: undefined,
+                      errorMessage: undefined
                     }
                   : s
               );
@@ -502,59 +742,125 @@ const useVideoStore = create<VideoStore>()(
               get().saveCurrentProject();
               
               console.log(`✅ Scene ${sceneId} completed successfully with video: ${response.data.videoUrl}`);
-              return; // Stop polling for this scene
+              return;
               
             } else if (response.data.status === 'error') {
-              // Update scene status to failed - use fresh scenes state
               const currentScenes = get().scenes;
               const updatedScenes = currentScenes.map(s =>
                 s.id === sceneId
                   ? { 
                       ...s, 
                       generationStatus: 'failed' as const,
-                      errorMessage: response.data.errorMessage || 'Generation failed'
+                      errorMessage: response.data.errorMessage || 'Error en la generación',
+                      errorType: response.data.code || 'GENERATION_ERROR',
+                      canRetry: true,
+                      lastPolledAt: new Date().toISOString()
                     }
                   : s
               );
               set({ scenes: updatedScenes });
-              return; // Stop polling for this scene
+              return;
               
             } else {
-              // Still processing (waiting or generating), continue polling
+              // Still processing - analizar progreso
               attempts++;
               
-              // Update progress - use fresh scenes state
-              const progress = response.data.progress || Math.min(50 + (attempts * 2), 95);
+              const currentProgress = response.data.progress || Math.min(10 + (attempts * 1.5), 95);
+              
+              // Detectar si está atascado en el mismo progreso
+              if (currentProgress === lastProgress) {
+                stuckAtProgressCount++;
+              } else {
+                stuckAtProgressCount = 0;
+                lastProgress = currentProgress;
+              }
+              
+              // Detectar si está atascado en 50% por mucho tiempo
+              if (currentProgress === 50 && attempts > 10) {
+                stuckAtProgressCount = Math.max(stuckAtProgressCount, 6);
+              }
+
+              // 🚨 CONDICIÓN CRÍTICA: Si está muy atascado, detener
+              if (stuckAtProgressCount > 8) {
+                console.log(`🛑 DETENIENDO polling para scene ${sceneId} - demasiado tiempo atascado`);
+                isPollingActive = false;
+                return; // Salir inmediatamente
+              }
+              
               const currentScenes = get().scenes;
               const updatedScenes = currentScenes.map(s =>
                 s.id === sceneId
-                  ? { ...s, videoProgress: progress }
+                  ? { 
+                      ...s, 
+                      videoProgress: currentProgress,
+                      lastPolledAt: new Date().toISOString(),
+                      isStuck: stuckAtProgressCount > 5
+                    }
                   : s
               );
               set({ scenes: updatedScenes });
               
-              // Continue polling
-              setTimeout(poll, 10000); // Poll every 10 seconds
+              // 🚨 SOLO continuar si el polling sigue activo
+              if (isPollingActive && attempts < maxAttempts) {
+                const pollingInterval = stuckAtProgressCount > 3 ? 15000 : 12000;
+                setTimeout(poll, pollingInterval);
+              } else {
+                console.log(`🛑 Polling detenido para scene ${sceneId} - límites alcanzados`);
+                isPollingActive = false;
+              }
             }
             
           } catch (error) {
             console.error(`Error polling video status for scene ${sceneId}:`, error);
+            consecutiveErrors++;
             attempts++;
-            if (attempts < maxAttempts) {
-              setTimeout(poll, 10000);
-            } else {
-              // Max attempts reached, mark as failed
+            
+            // Analizar el tipo de error
+            let errorType = 'UNKNOWN_ERROR';
+            let errorMessage = 'Error desconocido';
+            
+                         if (axios.isAxiosError(error)) {
+               if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+                 errorType = 'TIMEOUT_ERROR';
+                 errorMessage = 'Tiempo de espera agotado en la consulta';
+               } else if (error.response && error.response.status === 404) {
+                 errorType = 'NOT_FOUND';
+                 errorMessage = 'Video no encontrado en el servidor';
+               } else if (error.response && error.response.status === 429) {
+                 errorType = 'RATE_LIMIT';
+                 errorMessage = 'Límite de consultas excedido';
+               } else if (error.response && error.response.status >= 500) {
+                 errorType = 'SERVER_ERROR';
+                 errorMessage = 'Error del servidor de video';
+               }
+             }
+            
+            // Si hay muchos errores consecutivos, marcar como fallido
+            if (consecutiveErrors >= 5 || attempts >= maxAttempts) {
               const currentScenes = get().scenes;
               const updatedScenes = currentScenes.map(s =>
                 s.id === sceneId
                   ? { 
                       ...s, 
                       generationStatus: 'failed' as const,
-                      errorMessage: 'Polling failed after maximum attempts'
+                      errorMessage: errorMessage,
+                      errorType: errorType,
+                      canRetry: true,
+                      lastPolledAt: new Date().toISOString()
                     }
                   : s
               );
               set({ scenes: updatedScenes });
+              return;
+            }
+            
+            // 🚨 SOLO continuar si el polling sigue activo
+            if (isPollingActive && attempts < maxAttempts && consecutiveErrors < 5) {
+              const retryInterval = Math.min(15000 * Math.pow(1.5, consecutiveErrors), 60000);
+              setTimeout(poll, retryInterval);
+            } else {
+              console.log(`🛑 Polling detenido por errores para scene ${sceneId}`);
+              isPollingActive = false;
             }
           }
         };
@@ -980,6 +1286,12 @@ const useVideoStore = create<VideoStore>()(
       },
 
       reset: () => {
+        // Limpiar URLs de preview de imágenes
+        const currentImages = get().uploadedImages;
+        currentImages.forEach(image => {
+          URL.revokeObjectURL(image.preview);
+        });
+
         set({
           currentStep: 'selection',
           projectName: '',
@@ -991,11 +1303,832 @@ const useVideoStore = create<VideoStore>()(
           scenes: [],
           isLoading: false,
           error: null,
-          currentProject: null
+          currentProject: null,
+          uploadedImages: []
         });
-      }
-    }),
-    {
+      },
+
+      // New functions
+      retrySceneGeneration: async (sceneId: string, retryType: 'same-prompt' | 'regenerate-prompt' | 'force-new' = 'same-prompt') => {
+        const scene = get().scenes.find(s => s.id === sceneId);
+        if (!scene) {
+          console.error('Scene not found for retry:', sceneId);
+          return;
+        }
+
+        console.log(`🔄 Retrying scene ${sceneId} with type: ${retryType}`);
+
+        // Resetear estado de la escena
+        const currentScenes = get().scenes;
+        const updatedScenes = currentScenes.map(s =>
+          s.id === sceneId
+            ? { 
+                ...s, 
+                generationStatus: 'generating' as const,
+                videoProgress: 0,
+                errorMessage: undefined,
+                errorType: undefined,
+                canRetry: false,
+                isStuck: false,
+                retryCount: (s.retryCount || 0) + 1,
+                lastRetryAt: new Date().toISOString()
+              }
+            : s
+        );
+        set({ scenes: updatedScenes });
+
+        try {
+          let promptToUse = scene.optimizedPrompt || scene.description;
+          
+                     if (retryType === 'regenerate-prompt') {
+             // Regenerar el prompt con contexto adicional
+             const variations = [
+               'enhanced cinematic quality, professional video production',
+               'improved visual storytelling, dynamic composition',
+               'better lighting and atmosphere, high-end production value',
+               'refined cinematography, smooth camera movements'
+             ];
+             const randomVariation = variations[Math.floor(Math.random() * variations.length)];
+             promptToUse = `${scene.description}. ${randomVariation}`;
+           } else if (retryType === 'force-new') {
+            // Forzar un prompt completamente nuevo con variaciones
+            const variations = [
+              'cinematic style, high quality, professional lighting',
+              'dynamic camera movement, vivid colors, detailed textures',
+              'atmospheric lighting, rich details, smooth motion',
+              'professional cinematography, balanced composition, natural flow'
+            ];
+            const randomVariation = variations[Math.floor(Math.random() * variations.length)];
+            promptToUse = `${scene.description}. ${randomVariation}`;
+          }
+
+          // Llamar a la API de generación
+          const response = await axios.post('/api/generate-video', {
+            prompt: promptToUse,
+            sceneId: sceneId,
+            retryAttempt: (scene.retryCount || 0) + 1
+          });
+
+          if (response.data.success && response.data.generationId) {
+            // Actualizar con el nuevo job ID
+            const scenesAfterGeneration = get().scenes;
+            const updatedScenesAfterGeneration = scenesAfterGeneration.map(s =>
+              s.id === sceneId
+                ? { 
+                    ...s, 
+                    aimlJobId: response.data.generationId,
+                    optimizedPrompt: promptToUse,
+                    videoProgress: 10
+                  }
+                : s
+            );
+            set({ scenes: updatedScenesAfterGeneration });
+
+            // Comenzar polling
+            await get().pollVideoStatus(sceneId);
+            
+          } else {
+            throw new Error('Failed to start video generation');
+          }
+          
+        } catch (error) {
+          console.error('Error retrying scene generation:', error);
+          
+          // Marcar como fallido el reintento
+          const scenesAfterError = get().scenes;
+          const updatedScenesAfterError = scenesAfterError.map(s =>
+            s.id === sceneId
+              ? { 
+                  ...s, 
+                  generationStatus: 'failed' as const,
+                  errorMessage: 'Error al reintentar la generación',
+                  errorType: 'RETRY_FAILED',
+                  canRetry: true
+                }
+              : s
+          );
+          set({ scenes: updatedScenesAfterError });
+        }
+      },
+
+      // Nueva función para diagnóstico de problemas
+      diagnoseSceneIssue: async (sceneId: string) => {
+        const scene = get().scenes.find(s => s.id === sceneId);
+        if (!scene) return null;
+
+        const diagnosis = {
+          sceneId,
+          status: scene.generationStatus,
+          errorType: scene.errorType,
+          canRetry: scene.canRetry,
+          isStuck: scene.isStuck,
+          progress: scene.videoProgress,
+          retryCount: scene.retryCount || 0,
+          recommendations: [] as string[],
+          actions: [] as { label: string; action: string; type: 'primary' | 'secondary' }[]
+        };
+
+        // Analizar problema y generar recomendaciones
+        if (scene.errorType === 'TIMEOUT' || scene.isStuck) {
+          diagnosis.recommendations.push('El video se quedó atascado durante la generación');
+          diagnosis.actions.push({
+            label: 'Reintentar con mismo prompt',
+            action: 'retry-same',
+            type: 'primary'
+          });
+          diagnosis.actions.push({
+            label: 'Regenerar prompt optimizado',
+            action: 'retry-regenerate',
+            type: 'secondary'
+          });
+        } else if (scene.errorType === 'NOT_FOUND') {
+          diagnosis.recommendations.push('El video no se encontró en el servidor');
+          diagnosis.actions.push({
+            label: 'Generar nuevo video',
+            action: 'retry-new',
+            type: 'primary'
+          });
+        } else if (scene.errorType === 'SERVER_ERROR') {
+          diagnosis.recommendations.push('Problema temporal del servidor');
+          diagnosis.actions.push({
+            label: 'Reintentar ahora',
+            action: 'retry-same',
+            type: 'primary'
+          });
+        } else if (scene.errorType === 'GENERATION_ERROR') {
+          diagnosis.recommendations.push('El prompt podría tener contenido problemático');
+          diagnosis.actions.push({
+            label: 'Mejorar prompt automáticamente',
+            action: 'retry-regenerate',
+            type: 'primary'
+          });
+          diagnosis.actions.push({
+            label: 'Crear prompt completamente nuevo',
+            action: 'retry-new',
+            type: 'secondary'
+          });
+        }
+
+                 return diagnosis;
+       },
+
+       // Image management functions
+       uploadImage: async (file: File, type: 'persona' | 'objeto' | 'entorno') => {
+         const currentImages = get().uploadedImages;
+         
+         if (currentImages.length >= get().maxImages) {
+           set({ error: `Máximo ${get().maxImages} imágenes por proyecto` });
+           return;
+         }
+
+         // Generar tag único
+         const typeCount = currentImages.filter(img => img.type === type).length + 1;
+         const typeNames = {
+           'persona': 'Personaje',
+           'objeto': 'Objeto', 
+           'entorno': 'Entorno'
+         };
+         const tag = `${typeNames[type]}_${typeCount}`;
+
+         // Crear preview URL
+         const preview = URL.createObjectURL(file);
+
+         const newImage: UploadedImage = {
+           id: `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+           file,
+           preview,
+           type,
+           tag,
+           isAnalyzing: true,
+           uploadedAt: new Date()
+         };
+
+         // Agregar imagen al estado
+         set({ 
+           uploadedImages: [...currentImages, newImage],
+           error: null 
+         });
+
+         // Analizar imagen con IA
+         await get().analyzeImageWithAI(newImage.id);
+       },
+
+       removeImage: (imageId: string) => {
+         const currentImages = get().uploadedImages;
+         const imageToRemove = currentImages.find(img => img.id === imageId);
+         
+         if (imageToRemove) {
+           // Limpiar URL de preview
+           URL.revokeObjectURL(imageToRemove.preview);
+           
+           // Remover imagen
+           const updatedImages = currentImages.filter(img => img.id !== imageId);
+           set({ uploadedImages: updatedImages });
+         }
+       },
+
+       analyzeImageWithAI: async (imageId: string) => {
+         const currentImages = get().uploadedImages;
+         const image = currentImages.find(img => img.id === imageId);
+         
+         if (!image) return;
+
+         try {
+           // Convertir imagen a base64
+           const base64 = await get().fileToBase64(image.file);
+           
+           // Llamar a API de análisis
+           const response = await axios.post('/api/analyze-image', {
+             image: base64,
+             type: image.type,
+             filename: image.file.name
+           });
+
+           if (response.data.success) {
+             // Actualizar imagen con descripción
+             const updatedImages = currentImages.map(img =>
+               img.id === imageId
+                 ? { 
+                     ...img, 
+                     description: response.data.description,
+                     isAnalyzing: false,
+                     analysisError: undefined
+                   }
+                 : img
+             );
+             set({ uploadedImages: updatedImages });
+           } else {
+             throw new Error(response.data.error || 'Error analyzing image');
+           }
+
+         } catch (error) {
+           console.error('Error analyzing image:', error);
+           
+           // Marcar error en la imagen
+           const updatedImages = currentImages.map(img =>
+             img.id === imageId
+               ? { 
+                   ...img, 
+                   isAnalyzing: false,
+                   analysisError: 'Error al analizar la imagen'
+                 }
+               : img
+           );
+           set({ uploadedImages: updatedImages });
+         }
+       },
+
+       insertImageTag: (tag: string, position: number) => {
+         const currentDescription = get().description;
+         const newDescription = 
+           currentDescription.slice(0, position) + 
+           tag + 
+           currentDescription.slice(position);
+         set({ description: newDescription });
+       },
+
+       replaceTagsInDescription: (text: string) => {
+         const images = get().uploadedImages;
+         let replacedText = text;
+
+         images.forEach(image => {
+           if (image.description) {
+             const tagRegex = new RegExp(image.tag, 'g');
+             replacedText = replacedText.replace(tagRegex, image.description);
+           }
+         });
+
+         return replacedText;
+       },
+
+       // Helper function
+       fileToBase64: (file: File): Promise<string> => {
+         return new Promise((resolve, reject) => {
+           const reader = new FileReader();
+           reader.readAsDataURL(file);
+           reader.onload = () => {
+             if (typeof reader.result === 'string') {
+               resolve(reader.result.split(',')[1]); // Remove data:image/jpeg;base64, prefix
+             } else {
+               reject(new Error('Failed to convert file to base64'));
+             }
+           };
+           reader.onerror = error => reject(error);
+         });
+       },
+
+       // OpenAI quota management functions
+       checkOpenAIQuota: async () => {
+         try {
+           console.log('🔍 Verificando fondos de OpenAI...');
+           
+           const response = await axios.get('/api/check-quota');
+           const { hasQuota, message, mode } = response.data;
+           
+           set({
+             openaiQuotaStatus: {
+               hasQuota,
+               message,
+               mode,
+               lastChecked: new Date()
+             }
+           });
+           
+           console.log(`✅ Estado de fondos: ${message}`);
+           
+         } catch (error) {
+           console.error('Error verificando fondos:', error);
+           
+           set({
+             openaiQuotaStatus: {
+               hasQuota: false,
+               message: 'Error verificando fondos - usando modo respaldo',
+               mode: 'fallback',
+               lastChecked: new Date()
+             }
+           });
+         }
+       },
+
+       setQuotaStatus: (status) => {
+         set({
+           openaiQuotaStatus: {
+             ...status,
+             lastChecked: new Date()
+           }
+         });
+       },
+
+       // Campaign management functions
+       createCampaign: async (campaignData) => {
+         const newCampaign: Campaign = {
+           ...campaignData,
+           id: `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+           createdAt: new Date().toISOString(),
+           generatedVideos: 0,
+           publishedVideos: 0,
+           contentPlan: []
+         };
+
+         set(state => ({
+           campaigns: [...state.campaigns, newCampaign]
+         }));
+
+         // Generar plan de contenido automáticamente
+         await get().generateCampaignContent(newCampaign.id);
+       },
+
+       updateCampaign: (campaignId, updates) => {
+         set(state => ({
+           campaigns: state.campaigns.map(campaign =>
+             campaign.id === campaignId ? { ...campaign, ...updates } : campaign
+           )
+         }));
+       },
+
+       deleteCampaign: (campaignId) => {
+         set(state => ({
+           campaigns: state.campaigns.filter(campaign => campaign.id !== campaignId)
+         }));
+       },
+
+       pauseCampaign: (campaignId) => {
+         get().updateCampaign(campaignId, { status: 'paused' });
+       },
+
+       resumeCampaign: (campaignId) => {
+         get().updateCampaign(campaignId, { status: 'active' });
+       },
+
+       archiveCampaign: (campaignId) => {
+         get().updateCampaign(campaignId, { status: 'archived' });
+       },
+
+       generateCampaignContent: async (campaignId) => {
+         const campaign = get().campaigns.find(c => c.id === campaignId);
+         if (!campaign) return;
+
+         // Calcular fechas y generar plan de contenido
+         const startDate = new Date(campaign.startDate);
+         const endDate = campaign.endDate ? new Date(campaign.endDate) : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 días por defecto
+         
+         const contentPlan: WeeklyContentPlan[] = [];
+         let currentWeek = 1;
+         let currentDate = new Date(startDate);
+
+         while (currentDate <= endDate) {
+           const weekStart = new Date(currentDate);
+           const weekEnd = new Date(currentDate.getTime() + 6 * 24 * 60 * 60 * 1000);
+           
+           const weekVideos: CampaignVideo[] = [];
+           
+           // Generar videos para esta semana
+           for (let day = 0; day < 7; day++) {
+             const videoDate = new Date(weekStart.getTime() + day * 24 * 60 * 60 * 1000);
+             const dayName = videoDate.toLocaleDateString('es-ES', { weekday: 'long' });
+             
+             if (campaign.scheduledDays.includes(dayName) || campaign.scheduledDays.includes('Todos los días')) {
+               campaign.scheduledTimes.forEach(time => {
+                 const videoId = `video_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                 
+                 weekVideos.push({
+                   id: videoId,
+                   title: `${campaign.name} - ${videoDate.toLocaleDateString('es-ES')}`,
+                   description: `[Pendiente de generar] - ${campaign.campaignDescription}`,
+                   scheduledDate: videoDate.toISOString().split('T')[0],
+                   scheduledTime: time,
+                   socialNetworks: campaign.socialNetworks,
+                   status: 'scheduled',
+                   scenes: []
+                 });
+               });
+             }
+           }
+
+           if (weekVideos.length > 0) {
+             contentPlan.push({
+               weekNumber: currentWeek,
+               startDate: weekStart.toISOString().split('T')[0],
+               endDate: weekEnd.toISOString().split('T')[0],
+               videos: weekVideos
+             });
+           }
+
+           currentDate = new Date(weekEnd.getTime() + 1 * 24 * 60 * 60 * 1000);
+           currentWeek++;
+         }
+
+         // Actualizar campaña con el plan de contenido
+         const totalVideos = contentPlan.reduce((sum, week) => sum + week.videos.length, 0);
+         
+         get().updateCampaign(campaignId, {
+           contentPlan,
+           totalVideos
+         });
+
+         // Generar descripciones específicas con IA
+         await get().generateVideoDescriptions(campaignId);
+       },
+
+       generateVideoDescriptions: async (campaignId) => {
+         const campaign = get().campaigns.find(c => c.id === campaignId);
+         if (!campaign) return;
+
+         console.log('🤖 Generando descripciones específicas para cada video...');
+
+         for (let weekIndex = 0; weekIndex < campaign.contentPlan.length; weekIndex++) {
+           const week = campaign.contentPlan[weekIndex];
+           
+           for (let videoIndex = 0; videoIndex < week.videos.length; videoIndex++) {
+             const video = week.videos[videoIndex];
+             
+             try {
+               // Generar descripción específica usando IA
+               const specificDescription = await get().generateSpecificVideoDescription(
+                 campaign.campaignDescription,
+                 campaign.objective,
+                 video.scheduledDate,
+                 video.socialNetworks,
+                 videoIndex + 1,
+                 week.videos.length
+               );
+
+               // Actualizar el video con la nueva descripción
+               const updatedVideo = {
+                 ...video,
+                 description: specificDescription
+               };
+
+               const updatedContentPlan = [...campaign.contentPlan];
+               updatedContentPlan[weekIndex].videos[videoIndex] = updatedVideo;
+
+               get().updateCampaign(campaignId, {
+                 contentPlan: updatedContentPlan
+               });
+
+             } catch (error) {
+               console.error(`Error generando descripción para video ${video.id}:`, error);
+               // Mantener descripción por defecto si hay error
+             }
+           }
+         }
+
+         console.log('✅ Descripciones generadas completamente');
+       },
+
+       generateSpecificVideoDescription: async (campaignDescription, objective, scheduledDate, socialNetworks, videoNumber, totalVideosInWeek) => {
+         try {
+           const response = await fetch('/api/prompt-engineering', {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+             },
+             body: JSON.stringify({
+               type: 'campaign_video_description',
+               campaignDescription,
+               objective,
+               scheduledDate,
+               socialNetworks: socialNetworks.join(', '),
+               videoNumber,
+               totalVideosInWeek
+             }),
+           });
+
+           if (!response.ok) {
+             throw new Error('Error en la generación de descripción');
+           }
+
+           const data = await response.json();
+           return data.description || `Contenido específico basado en: ${campaignDescription}`;
+         } catch (error) {
+           console.error('Error generando descripción específica:', error);
+           return `Contenido específico basado en: ${campaignDescription}`;
+         }
+       },
+
+       regenerateVideoDescription: async (campaignId, videoId) => {
+         const campaign = get().campaigns.find(c => c.id === campaignId);
+         if (!campaign) return;
+
+         // Encontrar el video
+         let targetVideo: CampaignVideo | null = null;
+         let weekIndex = -1;
+         let videoIndex = -1;
+
+         for (let i = 0; i < campaign.contentPlan.length; i++) {
+           const videoIdx = campaign.contentPlan[i].videos.findIndex(v => v.id === videoId);
+           if (videoIdx !== -1) {
+             targetVideo = campaign.contentPlan[i].videos[videoIdx];
+             weekIndex = i;
+             videoIndex = videoIdx;
+             break;
+           }
+         }
+
+         if (!targetVideo) return;
+
+         try {
+           // Regenerar descripción específica
+           const newDescription = await get().generateSpecificVideoDescription(
+             campaign.campaignDescription,
+             campaign.objective,
+             targetVideo.scheduledDate,
+             targetVideo.socialNetworks,
+             videoIndex + 1,
+             campaign.contentPlan[weekIndex].videos.length
+           );
+
+           // Actualizar el video
+           const updatedVideo = {
+             ...targetVideo,
+             description: newDescription
+           };
+
+           const updatedContentPlan = [...campaign.contentPlan];
+           updatedContentPlan[weekIndex].videos[videoIndex] = updatedVideo;
+
+           get().updateCampaign(campaignId, {
+             contentPlan: updatedContentPlan
+           });
+
+           console.log('✅ Descripción regenerada exitosamente');
+         } catch (error) {
+           console.error('Error regenerando descripción:', error);
+         }
+       },
+
+       simulatePublishVideo: async (campaignId, videoId) => {
+         const campaign = get().campaigns.find(c => c.id === campaignId);
+         if (!campaign) return;
+
+         // Encontrar el video en el plan de contenido
+         let targetVideo: CampaignVideo | null = null;
+         let weekIndex = -1;
+         let videoIndex = -1;
+
+         for (let i = 0; i < campaign.contentPlan.length; i++) {
+           const videoIdx = campaign.contentPlan[i].videos.findIndex(v => v.id === videoId);
+           if (videoIdx !== -1) {
+             targetVideo = campaign.contentPlan[i].videos[videoIdx];
+             weekIndex = i;
+             videoIndex = videoIdx;
+             break;
+           }
+         }
+
+         if (!targetVideo) return;
+
+         // Generar título y descripción optimizados
+         const generatedTitle = `🚀 ${targetVideo.title} | ${campaign.name}`;
+         const generatedDescription = `${targetVideo.description}\n\n📈 Optimizado para ${targetVideo.socialNetworks.join(', ')}\n#marketing #contenido #${campaign.name.toLowerCase().replace(/\s+/g, '')}`;
+
+         // Simular publicación
+         const updatedVideo: CampaignVideo = {
+           ...targetVideo,
+           status: 'published',
+           generatedTitle,
+           generatedDescription,
+           publishedAt: new Date().toISOString()
+         };
+
+         // Actualizar el video en la campaña
+         const updatedContentPlan = [...campaign.contentPlan];
+         updatedContentPlan[weekIndex].videos[videoIndex] = updatedVideo;
+
+         get().updateCampaign(campaignId, {
+           contentPlan: updatedContentPlan,
+           publishedVideos: campaign.publishedVideos + 1
+         });
+
+         console.log(`📱 Video "${generatedTitle}" simulado como publicado en ${targetVideo.socialNetworks.join(', ')}`);
+       },
+
+       generateCampaignVideo: async (campaignId, videoId) => {
+         const campaign = get().campaigns.find(c => c.id === campaignId);
+         if (!campaign) return;
+
+         // Encontrar el video en el plan de contenido
+         let targetVideo: CampaignVideo | null = null;
+         let weekIndex = -1;
+         let videoIndex = -1;
+
+         for (let i = 0; i < campaign.contentPlan.length; i++) {
+           const videoIdx = campaign.contentPlan[i].videos.findIndex(v => v.id === videoId);
+           if (videoIdx !== -1) {
+             targetVideo = campaign.contentPlan[i].videos[videoIdx];
+             weekIndex = i;
+             videoIndex = videoIdx;
+             break;
+           }
+         }
+
+         if (!targetVideo) return;
+
+         // Marcar video como generando
+         const updatedVideo: CampaignVideo = {
+           ...targetVideo,
+           status: 'generating'
+         };
+
+         const updatedContentPlan = [...campaign.contentPlan];
+         updatedContentPlan[weekIndex].videos[videoIndex] = updatedVideo;
+
+         get().updateCampaign(campaignId, {
+           contentPlan: updatedContentPlan
+         });
+
+         try {
+           // Configurar el estado para generar el video usando el sistema existente
+           const videoConfig = {
+             objective: campaign.objective,
+             tone: campaign.tone,
+             style: campaign.style,
+             duration: campaign.duration,
+             description: targetVideo.description,
+             watermark: campaign.constants.watermark || '',
+             brandElements: campaign.constants.brandElements || [],
+             recurringPersons: campaign.constants.recurringPersons || []
+           };
+
+                       // Usar el sistema de generación existente
+            set({
+              currentStep: 'script-generation',
+              objective: videoConfig.objective,
+              tone: videoConfig.tone,
+              style: videoConfig.style,
+              duration: videoConfig.duration,
+              description: videoConfig.description,
+              scenes: []
+            });
+
+           // Generar script
+           await get().generateScript();
+           
+           // Generar videos de las escenas
+           await get().generateAllVideos();
+
+                       // Marcar video como generado y actualizar con URL
+            const currentState = get();
+            const finalVideo: CampaignVideo = {
+              ...updatedVideo,
+              status: 'generated',
+              videoUrl: `campaign_video_${videoId}_${Date.now()}.mp4`,
+              scenes: currentState.scenes
+            };
+
+           const finalContentPlan = [...campaign.contentPlan];
+           finalContentPlan[weekIndex].videos[videoIndex] = finalVideo;
+
+           get().updateCampaign(campaignId, {
+             contentPlan: finalContentPlan,
+             generatedVideos: campaign.generatedVideos + 1
+           });
+
+         } catch (error) {
+           console.error('Error generando video de campaña:', error);
+           
+           // Marcar video como fallido
+           const failedVideo: CampaignVideo = {
+             ...updatedVideo,
+             status: 'failed'
+           };
+
+           const failedContentPlan = [...campaign.contentPlan];
+           failedContentPlan[weekIndex].videos[videoIndex] = failedVideo;
+
+           get().updateCampaign(campaignId, {
+             contentPlan: failedContentPlan
+           });
+         }
+       },
+
+       downloadCampaignVideo: (campaignId, videoId) => {
+         const campaign = get().campaigns.find(c => c.id === campaignId);
+         if (!campaign) return;
+
+         // Encontrar el video en el plan de contenido
+         let targetVideo: CampaignVideo | null = null;
+
+         for (const week of campaign.contentPlan) {
+           const video = week.videos.find(v => v.id === videoId);
+           if (video) {
+             targetVideo = video;
+             break;
+           }
+         }
+
+         if (!targetVideo || !targetVideo.videoUrl) {
+           alert('Video no disponible para descarga');
+           return;
+         }
+
+         // Simular descarga del video
+         const link = document.createElement('a');
+         link.href = targetVideo.videoUrl;
+         link.download = `${targetVideo.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.mp4`;
+         document.body.appendChild(link);
+         link.click();
+         document.body.removeChild(link);
+       },
+
+       // 🚨 FUNCIONES DE EMERGENCIA
+       stopAllPolling: () => {
+         console.log('🛑 EMERGENCIA: Deteniendo todos los pollings activos');
+         
+         // Marcar todas las escenas que están generando como fallidas
+         const currentScenes = get().scenes;
+         const updatedScenes = currentScenes.map(scene => {
+           if (scene.generationStatus === 'generating') {
+             console.log(`🛑 Deteniendo polling para scene ${scene.id}`);
+             return {
+               ...scene,
+               generationStatus: 'failed' as const,
+               errorMessage: 'Polling detenido manualmente para prevenir consumo excesivo',
+               errorType: 'MANUAL_STOP',
+               canRetry: true,
+               lastPolledAt: new Date().toISOString()
+             };
+           }
+           return scene;
+         });
+         
+         set({ scenes: updatedScenes });
+         console.log('✅ Todos los pollings han sido detenidos');
+       },
+
+       forceStopGeneratingScenes: () => {
+         console.log('🚨 FUERZA MAYOR: Deteniendo todas las generaciones activas');
+         
+         const currentScenes = get().scenes;
+         const generatingCount = currentScenes.filter(s => s.generationStatus === 'generating').length;
+         
+         if (generatingCount === 0) {
+           console.log('ℹ️ No hay escenas generándose actualmente');
+           return;
+         }
+
+         const updatedScenes = currentScenes.map(scene => ({
+           ...scene,
+           generationStatus: scene.generationStatus === 'generating' ? 'failed' as const : scene.generationStatus,
+           errorMessage: scene.generationStatus === 'generating' 
+             ? 'Generación detenida por emergencia - consumo excesivo detectado' 
+             : scene.errorMessage,
+           errorType: scene.generationStatus === 'generating' ? 'EMERGENCY_STOP' : scene.errorType,
+           canRetry: scene.generationStatus === 'generating' ? true : scene.canRetry,
+           videoProgress: scene.generationStatus === 'generating' ? 0 : scene.videoProgress,
+           lastPolledAt: scene.generationStatus === 'generating' ? new Date().toISOString() : scene.lastPolledAt
+         }));
+         
+         set({ 
+           scenes: updatedScenes,
+           currentStep: 'scene-editing', // Volver al paso anterior
+           error: `⚠️ ${generatingCount} generaciones detenidas por consumo excesivo`
+         });
+         
+         console.log(`✅ ${generatingCount} generaciones han sido detenidas por emergencia`);
+       },
+      }),
+      {
       name: 'video-store',
       partialize: (state) => ({
         user: state.user,

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { ThemeProvider } from '@/lib/ThemeContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -35,9 +36,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${inter.className} h-full antialiased`}>
-        <div className="min-h-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-          {children}
-        </div>
+        <ThemeProvider>
+          <div className="min-h-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+            {children}
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

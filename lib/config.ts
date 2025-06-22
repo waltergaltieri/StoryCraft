@@ -1,6 +1,6 @@
 console.log('🔑 Loading API configuration...');
 
-// Validate API keys
+// Validate API keys - Solo usar variables de entorno
 const openaiKey = process.env.OPENAI_API_KEY;
 const aimlapiKey = process.env.AIMLAPI_KEY;
 const kieaiKey = process.env.KIEAI_API_KEY;

@@ -7,6 +7,7 @@ import ObjectiveSelector from './ObjectiveSelector';
 import SceneEditor from './SceneEditor';
 import VideoPreview from './VideoPreview';
 import VideoGenerationProgress from './VideoGenerationProgress';
+import ImageUploader from './ImageUploader';
 import Button from './ui/Button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
@@ -66,10 +67,10 @@ export default function VideoCreator() {
     switch (currentStep) {
       case 'selection':
         return (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {/* Project Name */}
             <div>
-              <h3 className="text-xl font-semibold text-white mb-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4">
                 Nombre de tu Proyecto
               </h3>
               <input
@@ -77,10 +78,10 @@ export default function VideoCreator() {
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder="Ej: Video Promocional Fitness App, Presentación Empresa, Tutorial Producto..."
-                className="w-full p-4 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full p-3 sm:p-4 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm sm:text-base"
                 maxLength={100}
               />
-              <p className="text-sm text-slate-400 mt-2">
+              <p className="text-xs sm:text-sm text-slate-400 mt-2">
                 Este nombre te ayudará a identificar tu proyecto en el dashboard
               </p>
             </div>
@@ -91,22 +92,22 @@ export default function VideoCreator() {
               <div className="space-y-6">
                 {/* Duration Selection */}
                 <div>
-                  <h3 className="text-xl font-semibold text-white mb-4">
+                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4">
                     Duración del Video
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     {[8, 16, 24, 32].map((dur) => (
                       <button
                         key={dur}
                         onClick={() => setDuration(dur)}
-                        className={`p-4 rounded-lg border-2 transition-all ${
+                        className={`p-3 sm:p-4 rounded-lg border-2 transition-all ${
                           duration === dur
                             ? 'border-indigo-500 bg-indigo-500/20 text-white'
                             : 'border-slate-600 bg-slate-700/50 text-slate-300 hover:border-slate-500'
                         }`}
                       >
-                        <div className="text-2xl font-bold">{dur}s</div>
-                        <div className="text-sm opacity-75">
+                        <div className="text-xl sm:text-2xl font-bold">{dur}s</div>
+                        <div className="text-xs sm:text-sm opacity-75">
                           {dur === 8 ? '1 escena' : 
                            dur === 16 ? '2 escenas' : 
                            dur === 24 ? '3 escenas' : '4 escenas'}
@@ -116,29 +117,32 @@ export default function VideoCreator() {
                   </div>
                 </div>
 
+                {/* Image Uploader */}
+                <ImageUploader />
+
                 {/* Description Input */}
                 <div>
-                  <h3 className="text-xl font-semibold text-white mb-4">
+                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-3 sm:mb-4">
                     Describe tu video
                   </h3>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Ej: Un video promocional para una nueva app de fitness que ayuda a los usuarios a mantenerse motivados con entrenamientos personalizados..."
-                    className="w-full h-32 p-4 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    placeholder="Ej: Un video promocional para una nueva app de fitness que ayuda a los usuarios a mantenerse motivados con entrenamientos personalizados. Puedes usar tags como Personaje_1, Objeto_1, Entorno_1..."
+                    className="w-full h-28 sm:h-32 p-3 sm:p-4 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-sm sm:text-base"
                   />
                 </div>
 
                 {/* Generate Button */}
                 {description && (
-                  <div className="flex justify-center">
+                  <div className="flex justify-center pt-4">
                     <Button
                       onClick={handleGenerateScript}
                       disabled={isLoading}
-                      className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-8 py-3 rounded-lg font-medium text-lg"
+                      className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 sm:px-8 py-3 rounded-lg font-medium text-base sm:text-lg"
                     >
                       {isLoading ? (
-                        <div className="flex items-center">
+                        <div className="flex items-center justify-center">
                           <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                           Generando Guión...
                         </div>
@@ -188,65 +192,62 @@ export default function VideoCreator() {
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
       <header className="bg-slate-800/50 backdrop-blur-lg border-b border-slate-700">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Button
                 onClick={handleBackToDashboard}
                 variant="ghost"
                 size="sm"
-                className="text-slate-400 hover:text-white mr-4"
+                className="text-slate-400 hover:text-white mr-2 sm:mr-4"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Dashboard
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Dashboard</span>
               </Button>
-              <h1 className="text-xl font-bold text-white">Crear Video</h1>
+              
+              <div className="flex items-center">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center mr-2 sm:mr-3">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 bg-white rounded-sm" />
+                </div>
+                <div>
+                  <h1 className="text-lg sm:text-xl font-bold text-white">
+                    {projectName || 'Nuevo Proyecto'}
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-400">
+                    {currentStep === 'selection' ? 'Selecciona tus preferencias' :
+                     currentStep === 'script-generation' ? 'Generando guión...' :
+                     currentStep === 'scene-editing' ? 'Edita tu guión' :
+                     currentStep === 'video-generation' ? 'Generando videos...' :
+                     currentStep === 'concatenating' ? 'Creando video final...' :
+                     currentStep === 'completed' ? 'Video completado' : 'En progreso'}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Progress Steps */}
-            <div className="hidden md:flex items-center space-x-4">
-              {[
-                { step: 'selection', label: 'Configuración' },
-                { step: 'scene-editing', label: 'Escenas' },
-                { step: 'video-generation', label: 'Generación' },
-                { step: 'concatenating', label: 'Compilación' },
-                { step: 'completed', label: 'Finalizado' }
-              ].map(({ step, label }, index) => (
-                <div key={step} className="flex items-center">
+            {/* Progress Indicator */}
+            <div className="hidden sm:flex items-center space-x-2">
+              <div className="flex items-center space-x-1">
+                {['selection', 'scene-editing', 'video-generation', 'completed'].map((step, index) => (
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                      currentStep === step
-                        ? 'bg-indigo-500 text-white'
-                        : currentStep === 'script-generation' && step === 'selection'
-                        ? 'bg-indigo-500 text-white'
-                        : ['video-generation', 'concatenating', 'completed'].includes(currentStep) && 
-                          ['selection', 'scene-editing'].includes(step)
-                        ? 'bg-green-500 text-white'
-                        : ['concatenating', 'completed'].includes(currentStep) && step === 'video-generation'
-                        ? 'bg-green-500 text-white'
-                        : currentStep === 'completed' && ['selection', 'scene-editing', 'video-generation', 'concatenating'].includes(step)
-                        ? 'bg-green-500 text-white'
-                        : 'bg-slate-600 text-slate-300'
+                    key={step}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      currentStep === step ? 'bg-purple-400' :
+                      ['selection', 'scene-editing', 'video-generation', 'completed'].indexOf(currentStep) > index ? 'bg-green-400' : 'bg-slate-600'
                     }`}
-                  >
-                    {index + 1}
-                  </div>
-                  <span className="ml-2 text-sm text-slate-300">{label}</span>
-                  {index < 4 && (
-                    <div className="w-8 h-0.5 bg-slate-600 mx-4" />
-                  )}
-                </div>
-              ))}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <p className="text-red-400">{error}</p>
+          <div className="mb-6 sm:mb-8 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+            <p className="text-red-300 text-sm sm:text-base">{error}</p>
           </div>
         )}
 
