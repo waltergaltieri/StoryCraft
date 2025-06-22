@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "check-config": "node scripts/check-config.js",
+    "setup-env": "cp .env.example .env.local && echo '✅ Archivo .env.local creado. Edítalo con tus API keys.'",
+    "dev-safe": "npm run check-config && npm run dev"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.0",
